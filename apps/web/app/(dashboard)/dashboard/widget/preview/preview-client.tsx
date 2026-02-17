@@ -1,8 +1,22 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import {
   Loader2,
   AlertCircle,
@@ -10,6 +24,9 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  Search,
+  X,
 } from 'lucide-react';
 import type {
   WidgetConfigResponse,
@@ -24,6 +41,59 @@ interface Props {
 
 type View = 'body' | 'form' | 'success';
 
+// ── Step Indicator ──────────────────────────────────────────────────────────
+
+function StepIndicator({ currentStep, primaryColor }: { currentStep: number; primaryColor: string }) {
+  const steps = ['Select Areas', 'Your Concerns', 'Your Info'];
+  return (
+    <div className="flex items-center justify-center gap-0 py-3 px-4">
+      {steps.map((label, i) => {
+        const isActive = i === currentStep;
+        const isCompleted = i < currentStep;
+        return (
+          <div key={label} className="flex items-center">
+            {i > 0 && (
+              <div
+                className="h-[2px] w-6"
+                style={{ backgroundColor: isCompleted ? primaryColor : '#e2e8f0' }}
+              />
+            )}
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className="flex items-center justify-center rounded-full transition-all duration-200"
+                style={{
+                  width: isActive ? 28 : 20,
+                  height: isActive ? 28 : 20,
+                  backgroundColor: isActive || isCompleted ? primaryColor : '#e2e8f0',
+                }}
+              >
+                {isCompleted ? (
+                  <Check className="h-3 w-3 text-white" />
+                ) : (
+                  <span
+                    className="text-[10px] font-bold"
+                    style={{ color: isActive ? 'white' : '#94a3b8' }}
+                  >
+                    {i + 1}
+                  </span>
+                )}
+              </div>
+              <span
+                className="text-[9px] font-medium whitespace-nowrap"
+                style={{ color: isActive ? primaryColor : '#94a3b8' }}
+              >
+                {label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main Component ──────────────────────────────────────────────────────────
+
 export function WidgetPreviewClient({ slug }: Props) {
   const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +107,27 @@ export function WidgetPreviewClient({ slug }: Props) {
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
+
+  // Phase 3 state
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [concernSearchQuery, setConcernSearchQuery] = useState('');
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+
+  // Phase 5 state — mobile
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileSheetRegion, setMobileSheetRegion] = useState<string | null>(null);
+
+  // Mobile detection
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(max-width: 639px)');
+    setIsMobile(mql.matches);
+    function onChange(e: MediaQueryListEvent) {
+      setIsMobile(e.matches);
+    }
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
 
   async function loadConfig(signal?: AbortSignal) {
     setLoading(true);
@@ -98,13 +189,14 @@ export function WidgetPreviewClient({ slug }: Props) {
     [genderRegions, selectedRegionSlugs]
   );
 
-  // Concerns from selected regions, grouped by region (sorted alphabetically)
+  // Concerns from selected regions, grouped by region
   const concernsByRegion = useMemo(() => {
-    const grouped: { regionName: string; concerns: (WidgetConcern & { regionSlug: string })[] }[] = [];
+    const grouped: { regionName: string; regionSlug: string; concerns: (WidgetConcern & { regionSlug: string })[] }[] = [];
     for (const region of selectedRegions) {
       if (region.concerns.length > 0) {
         grouped.push({
           regionName: region.name,
+          regionSlug: region.slug,
           concerns: region.concerns.map((c) => ({ ...c, regionSlug: region.slug })),
         });
       }
@@ -120,16 +212,64 @@ export function WidgetPreviewClient({ slug }: Props) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [config]);
 
+  // Auto-expand newly selected regions
+  useEffect(() => {
+    setExpandedRegions((prev) => {
+      const next = new Set(prev);
+      for (const group of concernsByRegion) {
+        next.add(group.regionSlug);
+      }
+      return next;
+    });
+  }, [concernsByRegion]);
+
   function handleAnchorClick(regionSlugs: string[]) {
     setSelectedRegionSlugs((prev) => {
       const next = new Set(prev);
-      // If all slugs in this anchor are already selected, deselect them
       const allSelected = regionSlugs.every((s) => next.has(s));
       if (allSelected) {
         regionSlugs.forEach((s) => next.delete(s));
       } else {
         regionSlugs.forEach((s) => next.add(s));
       }
+      return next;
+    });
+
+    // On mobile, open bottom sheet for the clicked anchor's first slug
+    if (isMobile && !regionSlugs.every((s) => selectedRegionSlugs.has(s))) {
+      setMobileSheetRegion(regionSlugs[0]);
+    }
+
+    // Auto-scroll to newly added region on desktop
+    if (!isMobile) {
+      const slugToScroll = regionSlugs[0];
+      requestAnimationFrame(() => {
+        const el = rightPanelRef.current?.querySelector(`[data-region-slug="${slugToScroll}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  }
+
+  function handleRemoveRegionBySlug(slug: string) {
+    setSelectedRegionSlugs((prev) => {
+      const next = new Set(prev);
+      next.delete(slug);
+      return next;
+    });
+    // Clear concerns for that region
+    const regionConcernIds = new Set(
+      genderRegions
+        .filter((r) => r.slug === slug)
+        .flatMap((r) => r.concerns.map((c) => c.id))
+    );
+    setSelectedConcernIds((prev) => {
+      const next = new Set(prev);
+      regionConcernIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    setExpandedRegions((prev) => {
+      const next = new Set(prev);
+      next.delete(slug);
       return next;
     });
   }
@@ -152,6 +292,15 @@ export function WidgetPreviewClient({ slug }: Props) {
     });
   }
 
+  function toggleRegionExpanded(slug: string) {
+    setExpandedRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
+
   function reset() {
     setView('body');
     setGender('female');
@@ -160,7 +309,42 @@ export function WidgetPreviewClient({ slug }: Props) {
     setSelectedServiceIds(new Set());
     setSmsOptIn(false);
     setEmailOptIn(false);
+    setExpandedRegions(new Set());
+    setConcernSearchQuery('');
+    setMobileSheetRegion(null);
   }
+
+  // Count selected concerns per region
+  const getRegionConcernCount = useCallback(
+    (regionSlug: string) => {
+      const region = genderRegions.find((r) => r.slug === regionSlug);
+      if (!region) return 0;
+      return region.concerns.filter((c) => selectedConcernIds.has(c.id)).length;
+    },
+    [genderRegions, selectedConcernIds]
+  );
+
+  // Popular concerns: top 3 by lowest display_order per region (only when region has > 3 concerns)
+  const getPopularConcernIds = useCallback(
+    (concerns: WidgetConcern[]) => {
+      if (concerns.length <= 3) return new Set<string>();
+      const sorted = [...concerns].sort((a, b) => a.display_order - b.display_order);
+      return new Set(sorted.slice(0, 3).map((c) => c.id));
+    },
+    []
+  );
+
+  // Mobile sheet: find concerns for the open region
+  const mobileSheetConcerns = useMemo(() => {
+    if (!mobileSheetRegion) return [];
+    const region = genderRegions.find((r) => r.slug === mobileSheetRegion);
+    return region?.concerns ?? [];
+  }, [mobileSheetRegion, genderRegions]);
+
+  const mobileSheetRegionName = useMemo(() => {
+    if (!mobileSheetRegion) return '';
+    return genderRegions.find((r) => r.slug === mobileSheetRegion)?.name ?? '';
+  }, [mobileSheetRegion, genderRegions]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -195,6 +379,57 @@ export function WidgetPreviewClient({ slug }: Props) {
   const primaryColor = branding.primary_color || '#e84393';
 
   const totalSelections = selectedConcernIds.size + selectedServiceIds.size;
+  const currentStep = view === 'body' ? (selectedRegionSlugs.size > 0 ? 1 : 0) : 2;
+
+  // ── Concern Button (shared between desktop panel and mobile sheet) ──
+
+  function renderConcernButton(concern: WidgetConcern, popularIds?: Set<string>) {
+    const isSelected = selectedConcernIds.has(concern.id);
+    const isPopular = popularIds?.has(concern.id) ?? false;
+
+    const button = (
+      <button
+        key={concern.id}
+        type="button"
+        onClick={() => toggleConcern(concern.id)}
+        className={`flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+          isSelected
+            ? 'border-pink-200 bg-pink-50'
+            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+        }`}
+      >
+        <div
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+            isSelected ? '' : 'border border-slate-300'
+          }`}
+          style={isSelected ? { backgroundColor: primaryColor } : undefined}
+        >
+          {isSelected && <Check className="h-3 w-3 text-white" />}
+        </div>
+        <span className={`flex-1 ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
+          {concern.name}
+        </span>
+        {isPopular && (
+          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50 px-1.5 py-0">
+            Popular
+          </Badge>
+        )}
+      </button>
+    );
+
+    if (concern.description) {
+      return (
+        <Tooltip key={concern.id}>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent side="left" className="max-w-[200px]">
+            {concern.description}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return button;
+  }
 
   // ── Success View ────────────────────────────────────────────────────
   if (view === 'success') {
@@ -239,6 +474,8 @@ export function WidgetPreviewClient({ slug }: Props) {
             Fill in your details and we&apos;ll reach out with personalized recommendations
           </p>
         </div>
+
+        <StepIndicator currentStep={2} primaryColor={primaryColor} />
 
         <div className="px-6 py-6 max-w-lg mx-auto space-y-4">
           {/* Standard fields */}
@@ -359,220 +596,321 @@ export function WidgetPreviewClient({ slug }: Props) {
   // ── Body Selection View (default) ─────────────────────────────────
 
   return (
-    <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
-      {/* Header */}
-      <div
-        className="px-6 py-4"
-        style={{ backgroundColor: primaryColor, color: '#fff' }}
-      >
-        {config.tenant.logo_url && (
-          <img
-            src={config.tenant.logo_url}
-            alt={config.tenant.name}
-            className="mx-auto mb-2 h-8 object-contain"
-          />
-        )}
-        <h2 className="text-lg font-bold text-center">
-          {branding.cta_text || 'Build Your Consultation Plan'}
-        </h2>
-        <p className="text-sm opacity-80 text-center mt-1">
-          Select the areas you&apos;d like to address
-        </p>
-      </div>
-
-      {/* Split layout: body left, panel right */}
-      <div className="flex" style={{ minHeight: 600 }}>
-        {/* Left: Body Diagram */}
-        <div className="flex-1 flex flex-col items-center justify-between py-4 px-2 border-r border-slate-100">
-          <div className="w-full max-w-[220px] flex-1 flex items-center">
-            <BodySilhouette
-              gender={gender}
-              selectedRegionSlugs={selectedRegionSlugs}
-              activeRegionSlugs={activeRegionSlugs}
-              onAnchorClick={handleAnchorClick}
-              primaryColor={primaryColor}
+    <TooltipProvider>
+      <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
+        {/* Header */}
+        <div
+          className="px-6 py-4"
+          style={{ backgroundColor: primaryColor, color: '#fff' }}
+        >
+          {config.tenant.logo_url && (
+            <img
+              src={config.tenant.logo_url}
+              alt={config.tenant.name}
+              className="mx-auto mb-2 h-8 object-contain"
             />
-          </div>
-
-          {/* Gender toggle */}
-          <div className="flex items-center gap-1 mt-3">
-            <button
-              type="button"
-              onClick={() => {
-                setGender('female');
-                setSelectedRegionSlugs(new Set());
-                setSelectedConcernIds(new Set());
-              }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                gender === 'female'
-                  ? 'text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-              style={gender === 'female' ? { backgroundColor: primaryColor } : undefined}
-            >
-              Female
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setGender('male');
-                setSelectedRegionSlugs(new Set());
-                setSelectedConcernIds(new Set());
-              }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                gender === 'male'
-                  ? 'text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-              style={gender === 'male' ? { backgroundColor: primaryColor } : undefined}
-            >
-              Male
-            </button>
-          </div>
+          )}
+          <h2 className="text-lg font-bold text-center">
+            {branding.cta_text || 'Build Your Consultation Plan'}
+          </h2>
+          <p className="text-sm opacity-80 text-center mt-1">
+            Select the areas you&apos;d like to address
+          </p>
         </div>
 
-        {/* Right: Concerns / Services Panel */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {selectedRegionSlugs.size === 0 ? (
-            // Empty state
-            <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-              <div className="rounded-full bg-slate-100 p-4 mb-3">
-                <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-slate-700">Select a body area</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Tap the <span className="font-semibold">+</span> buttons on the body to see
-                {showConcerns ? ' available concerns' : ' available treatments'}
-              </p>
+        {/* Step indicator */}
+        <StepIndicator currentStep={currentStep} primaryColor={primaryColor} />
+
+        {/* Split layout: body left, panel right — stacked on mobile */}
+        <div className="flex flex-col sm:flex-row" style={{ minHeight: 600 }}>
+          {/* Left: Body Diagram */}
+          <div className="flex-1 flex flex-col items-center justify-between py-4 px-2 border-b sm:border-b-0 sm:border-r border-slate-100 max-h-[350px] sm:max-h-none">
+            <div className="w-full max-w-[220px] flex-1 flex items-center">
+              <BodySilhouette
+                gender={gender}
+                selectedRegionSlugs={selectedRegionSlugs}
+                activeRegionSlugs={activeRegionSlugs}
+                onAnchorClick={handleAnchorClick}
+                primaryColor={primaryColor}
+              />
             </div>
-          ) : (
-            // Concerns or services list
-            <div className="flex-1 px-4 py-4 space-y-4">
-              {/* Show concerns */}
-              {showConcerns && concernsByRegion.map((group) => (
-                <div key={group.regionName}>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                    {group.regionName}
-                  </h4>
-                  <div className="space-y-1">
-                    {group.concerns.map((concern) => {
-                      const isSelected = selectedConcernIds.has(concern.id);
-                      return (
-                        <button
-                          key={concern.id}
-                          type="button"
-                          onClick={() => toggleConcern(concern.id)}
-                          className={`flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
-                            isSelected
-                              ? 'border-pink-200 bg-pink-50'
-                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
-                              isSelected ? '' : 'border border-slate-300'
-                            }`}
-                            style={isSelected ? { backgroundColor: primaryColor } : undefined}
-                          >
-                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                          </div>
-                          <span className={isSelected ? 'font-medium' : 'text-slate-700'}>
-                            {concern.name}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
 
-              {/* Show services */}
-              {showServices && servicesByCategory.map((cat) => (
-                <div key={cat.id}>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                    {cat.name}
-                  </h4>
-                  <div className="space-y-1">
-                    {cat.services.map((svc) => {
-                      const isSelected = selectedServiceIds.has(svc.id);
-                      return (
-                        <button
-                          key={svc.id}
-                          type="button"
-                          onClick={() => toggleService(svc.id)}
-                          className={`flex items-start gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
-                            isSelected
-                              ? 'border-pink-200 bg-pink-50'
-                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div
-                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${
-                              isSelected ? '' : 'border border-slate-300'
-                            }`}
-                            style={isSelected ? { backgroundColor: primaryColor } : undefined}
-                          >
-                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                          </div>
-                          <div>
-                            <span className={`block ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
-                              {svc.name}
-                            </span>
-                            {svc.description && (
-                              <span className="block text-xs text-muted-foreground mt-0.5">
-                                {svc.description}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+            {/* Gender toggle */}
+            <div className="flex items-center gap-1 mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setGender('female');
+                  setSelectedRegionSlugs(new Set());
+                  setSelectedConcernIds(new Set());
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  gender === 'female'
+                    ? 'text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+                style={gender === 'female' ? { backgroundColor: primaryColor } : undefined}
+              >
+                Female
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setGender('male');
+                  setSelectedRegionSlugs(new Set());
+                  setSelectedConcernIds(new Set());
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  gender === 'male'
+                    ? 'text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+                style={gender === 'male' ? { backgroundColor: primaryColor } : undefined}
+              >
+                Male
+              </button>
+            </div>
+          </div>
 
-              {/* No concerns/services for selected regions */}
-              {showConcerns && concernsByRegion.length === 0 && (
-                <p className="py-4 text-center text-xs text-muted-foreground">
-                  No concerns configured for the selected areas.
-                </p>
-              )}
+          {/* Mobile: summary bar below body */}
+          {isMobile && selectedRegionSlugs.size > 0 && (
+            <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 text-center">
+              <span className="text-xs text-slate-600">
+                {selectedRegionSlugs.size} area{selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; {selectedConcernIds.size} concern{selectedConcernIds.size !== 1 ? 's' : ''}
+              </span>
             </div>
           )}
 
-          {/* Continue button (sticky at bottom of right panel) */}
-          {(totalSelections > 0 || selectedRegionSlugs.size > 0) && (
-            <div className="sticky bottom-0 border-t bg-white px-4 py-3">
+          {/* Right: Concerns / Services Panel (hidden on mobile) */}
+          <div ref={rightPanelRef} className="flex-1 hidden sm:flex flex-col overflow-y-auto">
+            {selectedRegionSlugs.size === 0 ? (
+              // Empty state
+              <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+                <div className="rounded-full bg-slate-100 p-4 mb-3">
+                  <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-slate-700">Select a body area</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tap the <span className="font-semibold">+</span> buttons on the body to see
+                  {showConcerns ? ' available concerns' : ' available treatments'}
+                </p>
+              </div>
+            ) : (
+              // Concerns or services list
+              <div className="flex-1 px-4 py-4 space-y-1">
+                {/* Search filter */}
+                {showConcerns && selectedRegionSlugs.size > 0 && (
+                  <div className="relative mb-3">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      value={concernSearchQuery}
+                      onChange={(e) => setConcernSearchQuery(e.target.value)}
+                      placeholder="Search concerns..."
+                      className="text-sm pl-8 h-8"
+                    />
+                    {concernSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setConcernSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Accordion concern groups */}
+                {showConcerns && concernsByRegion.map((group) => {
+                  const isExpanded = expandedRegions.has(group.regionSlug);
+                  const selectedCount = getRegionConcernCount(group.regionSlug);
+                  const popularIds = getPopularConcernIds(group.concerns);
+
+                  // Apply search filter
+                  const filteredConcerns = concernSearchQuery
+                    ? group.concerns.filter((c) =>
+                        c.name.toLowerCase().includes(concernSearchQuery.toLowerCase())
+                      )
+                    : group.concerns;
+
+                  if (concernSearchQuery && filteredConcerns.length === 0) return null;
+
+                  return (
+                    <div key={group.regionSlug} data-region-slug={group.regionSlug}>
+                      {/* Region header — accordion toggle */}
+                      <div className="group flex items-center gap-2 py-2 cursor-pointer select-none" onClick={() => toggleRegionExpanded(group.regionSlug)}>
+                        <ChevronDown
+                          className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+                            isExpanded ? '' : '-rotate-90'
+                          }`}
+                        />
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex-1">
+                          {group.regionName}
+                        </h4>
+                        {selectedCount > 0 && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {selectedCount} selected
+                          </Badge>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveRegionBySlug(group.regionSlug);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity p-0.5"
+                          title="Remove region"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Collapsible concern list */}
+                      <div
+                        className={`overflow-hidden transition-all duration-200 ${
+                          isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        <div className="space-y-1 pb-2">
+                          {filteredConcerns.map((concern) =>
+                            renderConcernButton(concern, popularIds)
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Show services */}
+                {showServices && servicesByCategory.map((cat) => (
+                  <div key={cat.id}>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                      {cat.name}
+                    </h4>
+                    <div className="space-y-1">
+                      {cat.services.map((svc) => {
+                        const isSelected = selectedServiceIds.has(svc.id);
+                        return (
+                          <button
+                            key={svc.id}
+                            type="button"
+                            onClick={() => toggleService(svc.id)}
+                            className={`flex items-start gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                              isSelected
+                                ? 'border-pink-200 bg-pink-50'
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                                isSelected ? '' : 'border border-slate-300'
+                              }`}
+                              style={isSelected ? { backgroundColor: primaryColor } : undefined}
+                            >
+                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                            </div>
+                            <div>
+                              <span className={`block ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
+                                {svc.name}
+                              </span>
+                              {svc.description && (
+                                <span className="block text-xs text-muted-foreground mt-0.5">
+                                  {svc.description}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* No concerns/services for selected regions */}
+                {showConcerns && concernsByRegion.length === 0 && (
+                  <p className="py-4 text-center text-xs text-muted-foreground">
+                    No concerns configured for the selected areas.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Floating summary bar */}
+            {(totalSelections > 0 || selectedRegionSlugs.size > 0) && (
+              <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 flex-1">
+                    {selectedRegionSlugs.size} area{selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; {totalSelections} concern{totalSelections !== 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    className="text-white"
+                    size="sm"
+                    style={{ backgroundColor: primaryColor }}
+                    onClick={() => setView('form')}
+                  >
+                    Continue
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile: floating continue bar */}
+        {isMobile && (totalSelections > 0 || selectedRegionSlugs.size > 0) && (
+          <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-4 py-3 sm:hidden">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-500 flex-1">
+                {selectedRegionSlugs.size} area{selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; {totalSelections} concern{totalSelections !== 1 ? 's' : ''} selected
+              </span>
               <Button
-                className="w-full text-white"
+                className="text-white"
+                size="sm"
                 style={{ backgroundColor: primaryColor }}
                 onClick={() => setView('form')}
               >
                 Continue
                 <ChevronRight className="h-4 w-4 ml-1" />
-                {totalSelections > 0 && (
-                  <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                    {totalSelections}
-                  </span>
-                )}
               </Button>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Mobile bottom sheet for concerns */}
+        <Sheet open={!!mobileSheetRegion} onOpenChange={(open) => { if (!open) setMobileSheetRegion(null); }}>
+          <SheetContent side="bottom" className="max-h-[70vh] rounded-t-xl">
+            <SheetHeader>
+              <SheetTitle>{mobileSheetRegionName}</SheetTitle>
+              <SheetDescription>Select your concerns for this area</SheetDescription>
+            </SheetHeader>
+            <div className="overflow-y-auto px-4 pb-4 space-y-1">
+              {mobileSheetConcerns.map((concern) => {
+                const popularIds = getPopularConcernIds(mobileSheetConcerns);
+                return renderConcernButton(concern, popularIds);
+              })}
+              {mobileSheetConcerns.length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  No concerns configured for this area.
+                </p>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Footer */}
+        <div className="border-t px-6 py-3 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">
+            Powered by Consult Builder
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { reset(); loadConfig(); }}>
+            <RefreshCw className="h-3 w-3" />
+            Reset
+          </Button>
         </div>
       </div>
-
-      {/* Footer */}
-      <div className="border-t px-6 py-3 flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground">
-          Powered by Consult Builder
-        </span>
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { reset(); loadConfig(); }}>
-          <RefreshCw className="h-3 w-3" />
-          Reset
-        </Button>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

@@ -41,6 +41,23 @@ const MALE_ANCHORS: BodyAnchor[] = [
   { id: 'lower-legs', label: 'Lower Legs', x: 75, y: 520, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
+// Region-appropriate highlight radii
+function getHighlightRadius(anchorId: string): number {
+  switch (anchorId) {
+    case 'face': return 30;
+    case 'neck': return 22;
+    case 'chest': return 40;
+    case 'abdomen': return 38;
+    case 'flanks': return 28;
+    case 'arms': return 32;
+    case 'hands': return 22;
+    case 'intimate': return 28;
+    case 'thighs': return 45;
+    case 'lower-legs': return 40;
+    default: return 30;
+  }
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 interface BodySilhouetteProps {
@@ -48,6 +65,7 @@ interface BodySilhouetteProps {
   selectedRegionSlugs: Set<string>;
   activeRegionSlugs: Set<string>;
   onAnchorClick: (regionSlugs: string[]) => void;
+  onAnchorHover?: (anchorId: string | null) => void;
   primaryColor?: string;
 }
 
@@ -56,6 +74,7 @@ export function BodySilhouette({
   selectedRegionSlugs,
   activeRegionSlugs,
   onAnchorClick,
+  onAnchorHover,
   primaryColor = '#e84393',
 }: BodySilhouetteProps) {
   const path = gender === 'female' ? FEMALE_SILHOUETTE_PATH : MALE_SILHOUETTE_PATH;
@@ -69,12 +88,37 @@ export function BodySilhouette({
     a.regionSlugs.some((slug) => activeRegionSlugs.has(slug))
   );
 
+  function handleMouseEnter(anchorId: string) {
+    setHoveredId(anchorId);
+    onAnchorHover?.(anchorId);
+  }
+
+  function handleMouseLeave() {
+    setHoveredId(null);
+    onAnchorHover?.(null);
+  }
+
   return (
     <svg
       viewBox={`-15 -15 230 ${viewBoxH}`}
       className="h-full w-full"
       style={{ maxHeight: 600 }}
     >
+      <defs>
+        {/* Drop shadow filter */}
+        <filter id="anchor-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.1" />
+        </filter>
+
+        {/* Pulse animation for unselected anchors */}
+        <style>{`
+          @keyframes anchorPulse {
+            0%, 100% { r: 11; opacity: 0.08; }
+            50% { r: 15; opacity: 0.18; }
+          }
+        `}</style>
+      </defs>
+
       {/* Body outline */}
       <path
         d={path}
@@ -88,11 +132,10 @@ export function BodySilhouette({
       />
 
       {/* Anchor buttons */}
-      {visibleAnchors.map((anchor) => {
+      {visibleAnchors.map((anchor, index) => {
         const isSelected = anchor.regionSlugs.some((s) => selectedRegionSlugs.has(s));
         const labelX = anchor.labelSide === 'right' ? anchor.x + 18 : anchor.x - 18;
         const textAnchor = anchor.labelSide === 'right' ? 'start' : 'end';
-
         const isHovered = hoveredId === anchor.id;
 
         return (
@@ -100,9 +143,34 @@ export function BodySilhouette({
             key={anchor.id}
             className="cursor-pointer"
             onClick={() => onAnchorClick(anchor.regionSlugs)}
-            onMouseEnter={() => setHoveredId(anchor.id)}
-            onMouseLeave={() => setHoveredId(null)}
+            onMouseEnter={() => handleMouseEnter(anchor.id)}
+            onMouseLeave={handleMouseLeave}
           >
+            {/* Pulse glow on unselected, active anchors */}
+            {!isSelected && (
+              <circle
+                cx={anchor.x}
+                cy={anchor.y}
+                r="11"
+                fill={primaryColor}
+                style={{
+                  animation: `anchorPulse 2.5s ease-in-out ${index * 0.3}s infinite`,
+                }}
+              />
+            )}
+
+            {/* Hover highlight — radial glow centered on anchor */}
+            {isHovered && !isSelected && (
+              <circle
+                cx={anchor.x}
+                cy={anchor.y}
+                r={getHighlightRadius(anchor.id)}
+                fill={primaryColor}
+                opacity="0.1"
+                style={{ transition: 'opacity 0.2s ease' }}
+              />
+            )}
+
             {/* Outer glow when selected */}
             {isSelected && (
               <circle
@@ -119,32 +187,47 @@ export function BodySilhouette({
               cx={anchor.x}
               cy={anchor.y}
               r="11"
-              fill="white"
+              fill={isSelected ? primaryColor : 'white'}
               stroke={isSelected ? primaryColor : '#e2e8f0'}
               strokeWidth={isSelected ? '2' : '1.5'}
               className="transition-all duration-150"
               filter="url(#anchor-shadow)"
             />
 
-            {/* Plus icon */}
-            <line
-              x1={anchor.x - 4}
-              y1={anchor.y}
-              x2={anchor.x + 4}
-              y2={anchor.y}
-              stroke={isSelected ? primaryColor : '#94a3b8'}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <line
-              x1={anchor.x}
-              y1={anchor.y - 4}
-              x2={anchor.x}
-              y2={anchor.y + 4}
-              stroke={isSelected ? primaryColor : '#94a3b8'}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
+            {/* Selected: white checkmark */}
+            {isSelected ? (
+              <path
+                d={`M${anchor.x - 4} ${anchor.y} l3 3 5-6`}
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : (
+              <>
+                {/* Plus icon (horizontal) */}
+                <line
+                  x1={anchor.x - 4}
+                  y1={anchor.y}
+                  x2={anchor.x + 4}
+                  y2={anchor.y}
+                  stroke="#94a3b8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                {/* Plus icon (vertical) */}
+                <line
+                  x1={anchor.x}
+                  y1={anchor.y - 4}
+                  x2={anchor.x}
+                  y2={anchor.y + 4}
+                  stroke="#94a3b8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
 
             {/* Hover label */}
             <text
@@ -171,13 +254,6 @@ export function BodySilhouette({
           </g>
         );
       })}
-
-      {/* Drop shadow filter */}
-      <defs>
-        <filter id="anchor-shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.1" />
-        </filter>
-      </defs>
     </svg>
   );
 }

@@ -299,6 +299,7 @@ export interface WidgetConcern {
   name: string;
   slug: string;
   description: string | null;
+  display_order: number;
 }
 
 export interface WidgetFormField {

@@ -80,6 +80,7 @@ export async function GET(request: Request) {
       name: c.name,
       slug: c.slug,
       description: c.description,
+      display_order: c.display_order,
     });
     concernsByRegion.set(c.body_region_id, list);
   }
