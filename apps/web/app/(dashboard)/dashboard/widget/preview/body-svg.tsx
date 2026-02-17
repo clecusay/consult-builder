@@ -17,7 +17,7 @@ export interface BodyAnchor {
 // Female silhouette is 200 x 665 — one anchor per region, no bilateral duplicates
 const FEMALE_ANCHORS: BodyAnchor[] = [
   { id: 'face', label: 'Face', x: 100, y: 25, labelSide: 'right', regionSlugs: ['upper-face', 'midface', 'lower-face', 'lips'] },
-  { id: 'neck', label: 'Neck', x: 100, y: 78, labelSide: 'right', regionSlugs: ['neck'] },
+  { id: 'neck', label: 'Neck', x: 100, y: 88, labelSide: 'right', regionSlugs: ['neck'] },
   { id: 'chest', label: 'Chest', x: 135, y: 150, labelSide: 'right', regionSlugs: ['chest'] },
   { id: 'arms', label: 'Arms', x: 27, y: 245, labelSide: 'left', regionSlugs: ['arms'] },
   { id: 'abdomen', label: 'Abdomen', x: 100, y: 260, labelSide: 'right', regionSlugs: ['abdomen'] },
@@ -31,7 +31,7 @@ const FEMALE_ANCHORS: BodyAnchor[] = [
 // Male silhouette is 200 x 608 — one anchor per region
 const MALE_ANCHORS: BodyAnchor[] = [
   { id: 'face', label: 'Face', x: 100, y: 22, labelSide: 'right', regionSlugs: ['upper-face', 'midface', 'lower-face', 'lips'] },
-  { id: 'neck', label: 'Neck', x: 100, y: 72, labelSide: 'right', regionSlugs: ['neck'] },
+  { id: 'neck', label: 'Neck', x: 100, y: 82, labelSide: 'right', regionSlugs: ['neck'] },
   { id: 'chest', label: 'Chest', x: 138, y: 142, labelSide: 'right', regionSlugs: ['chest'] },
   { id: 'arms', label: 'Arms', x: 22, y: 228, labelSide: 'left', regionSlugs: ['arms'] },
   { id: 'abdomen', label: 'Abdomen', x: 100, y: 245, labelSide: 'right', regionSlugs: ['abdomen'] },
@@ -66,6 +66,7 @@ interface BodySilhouetteProps {
   activeRegionSlugs: Set<string>;
   onAnchorClick: (regionSlugs: string[]) => void;
   onAnchorHover?: (anchorId: string | null) => void;
+  onFaceClick?: () => void;
   primaryColor?: string;
 }
 
@@ -75,6 +76,7 @@ export function BodySilhouette({
   activeRegionSlugs,
   onAnchorClick,
   onAnchorHover,
+  onFaceClick,
   primaryColor = '#e84393',
 }: BodySilhouetteProps) {
   const path = gender === 'female' ? FEMALE_SILHOUETTE_PATH : MALE_SILHOUETTE_PATH;
@@ -142,7 +144,13 @@ export function BodySilhouette({
           <g
             key={anchor.id}
             className="cursor-pointer"
-            onClick={() => onAnchorClick(anchor.regionSlugs)}
+            onClick={() => {
+              if (anchor.id === 'face' && onFaceClick) {
+                onFaceClick();
+              } else {
+                onAnchorClick(anchor.regionSlugs);
+              }
+            }}
             onMouseEnter={() => handleMouseEnter(anchor.id)}
             onMouseLeave={handleMouseLeave}
           >
@@ -259,3 +267,211 @@ export function BodySilhouette({
 }
 
 export { FEMALE_ANCHORS, MALE_ANCHORS };
+
+// ── Face Silhouette ──────────────────────────────────────────────────────
+
+interface FaceAnchor {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  labelSide: 'left' | 'right';
+  regionSlug: string;
+}
+
+const FACE_ANCHORS: FaceAnchor[] = [
+  { id: 'upper-face', label: 'Upper Face', x: 100, y: 65, labelSide: 'right', regionSlug: 'upper-face' },
+  { id: 'midface', label: 'Midface', x: 100, y: 135, labelSide: 'right', regionSlug: 'midface' },
+  { id: 'lips', label: 'Lips', x: 100, y: 195, labelSide: 'right', regionSlug: 'lips' },
+  { id: 'lower-face', label: 'Lower Face', x: 100, y: 235, labelSide: 'right', regionSlug: 'lower-face' },
+];
+
+// Simple face outline path — oval head shape with jawline
+const FACE_OUTLINE_PATH =
+  'M100 10 C55 10, 25 55, 25 105 C25 145, 30 175, 45 205 C55 225, 70 248, 85 260 Q100 270, 115 260 C130 248, 145 225, 155 205 C170 175, 175 145, 175 105 C175 55, 145 10, 100 10 Z';
+
+// Ear paths
+const LEFT_EAR_PATH = 'M25 100 C18 100, 12 110, 12 125 C12 140, 18 150, 25 150';
+const RIGHT_EAR_PATH = 'M175 100 C182 100, 188 110, 188 125 C188 140, 182 150, 175 150';
+
+function getFaceHighlightRadius(anchorId: string): number {
+  switch (anchorId) {
+    case 'upper-face': return 35;
+    case 'midface': return 35;
+    case 'lips': return 25;
+    case 'lower-face': return 25;
+    default: return 30;
+  }
+}
+
+interface FaceSilhouetteProps {
+  selectedRegionSlugs: Set<string>;
+  activeRegionSlugs: Set<string>;
+  onAnchorClick: (regionSlugs: string[]) => void;
+  onAnchorHover?: (anchorId: string | null) => void;
+  primaryColor?: string;
+}
+
+export function FaceSilhouette({
+  selectedRegionSlugs,
+  activeRegionSlugs,
+  onAnchorClick,
+  onAnchorHover,
+  primaryColor = '#e84393',
+}: FaceSilhouetteProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const visibleAnchors = FACE_ANCHORS.filter((a) => activeRegionSlugs.has(a.regionSlug));
+
+  function handleMouseEnter(anchorId: string) {
+    setHoveredId(anchorId);
+    onAnchorHover?.(anchorId);
+  }
+
+  function handleMouseLeave() {
+    setHoveredId(null);
+    onAnchorHover?.(null);
+  }
+
+  return (
+    <svg
+      viewBox="-5 -5 210 285"
+      className="h-full w-full"
+      style={{ maxHeight: 500 }}
+    >
+      <defs>
+        <filter id="face-anchor-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.1" />
+        </filter>
+        <style>{`
+          @keyframes faceAnchorPulse {
+            0%, 100% { r: 11; opacity: 0.08; }
+            50% { r: 15; opacity: 0.18; }
+          }
+        `}</style>
+      </defs>
+
+      {/* Face outline */}
+      <path
+        d={FACE_OUTLINE_PATH}
+        fill="#faf5f5"
+        stroke={primaryColor}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+
+      {/* Ears */}
+      <path d={LEFT_EAR_PATH} fill="none" stroke={primaryColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.9" />
+      <path d={RIGHT_EAR_PATH} fill="none" stroke={primaryColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.9" />
+
+      {/* Subtle zone dividers */}
+      <line x1="40" y1="100" x2="160" y2="100" stroke={primaryColor} strokeWidth="0.5" opacity="0.2" strokeDasharray="4 3" />
+      <line x1="45" y1="165" x2="155" y2="165" stroke={primaryColor} strokeWidth="0.5" opacity="0.2" strokeDasharray="4 3" />
+      <line x1="55" y1="215" x2="145" y2="215" stroke={primaryColor} strokeWidth="0.5" opacity="0.2" strokeDasharray="4 3" />
+
+      {/* Anchor buttons */}
+      {visibleAnchors.map((anchor, index) => {
+        const isSelected = selectedRegionSlugs.has(anchor.regionSlug);
+        const labelX = anchor.labelSide === 'right' ? anchor.x + 18 : anchor.x - 18;
+        const textAnchor = anchor.labelSide === 'right' ? 'start' : 'end';
+        const isHovered = hoveredId === anchor.id;
+
+        return (
+          <g
+            key={anchor.id}
+            className="cursor-pointer"
+            onClick={() => onAnchorClick([anchor.regionSlug])}
+            onMouseEnter={() => handleMouseEnter(anchor.id)}
+            onMouseLeave={handleMouseLeave}
+          >
+            {!isSelected && (
+              <circle
+                cx={anchor.x}
+                cy={anchor.y}
+                r="11"
+                fill={primaryColor}
+                style={{
+                  animation: `faceAnchorPulse 2.5s ease-in-out ${index * 0.3}s infinite`,
+                }}
+              />
+            )}
+
+            {isHovered && !isSelected && (
+              <circle
+                cx={anchor.x}
+                cy={anchor.y}
+                r={getFaceHighlightRadius(anchor.id)}
+                fill={primaryColor}
+                opacity="0.1"
+                style={{ transition: 'opacity 0.2s ease' }}
+              />
+            )}
+
+            {isSelected && (
+              <circle
+                cx={anchor.x}
+                cy={anchor.y}
+                r="16"
+                fill={primaryColor}
+                opacity="0.15"
+              />
+            )}
+
+            <circle
+              cx={anchor.x}
+              cy={anchor.y}
+              r="11"
+              fill={isSelected ? primaryColor : 'white'}
+              stroke={isSelected ? primaryColor : '#e2e8f0'}
+              strokeWidth={isSelected ? '2' : '1.5'}
+              className="transition-all duration-150"
+              filter="url(#face-anchor-shadow)"
+            />
+
+            {isSelected ? (
+              <path
+                d={`M${anchor.x - 4} ${anchor.y} l3 3 5-6`}
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : (
+              <>
+                <line
+                  x1={anchor.x - 4} y1={anchor.y}
+                  x2={anchor.x + 4} y2={anchor.y}
+                  stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"
+                />
+                <line
+                  x1={anchor.x} y1={anchor.y - 4}
+                  x2={anchor.x} y2={anchor.y + 4}
+                  stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"
+                />
+              </>
+            )}
+
+            <text
+              x={labelX}
+              y={anchor.y + 1}
+              textAnchor={textAnchor}
+              dominantBaseline="middle"
+              fill="#475569"
+              fontSize="9"
+              fontWeight="600"
+              fontFamily="system-ui, sans-serif"
+              style={{ opacity: isHovered || isSelected ? 1 : 0, transition: 'opacity 0.15s ease' }}
+            >
+              {anchor.label}
+            </text>
+
+            <circle cx={anchor.x} cy={anchor.y} r="16" fill="transparent" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

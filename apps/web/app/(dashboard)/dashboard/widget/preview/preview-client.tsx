@@ -33,7 +33,7 @@ import type {
   WidgetConcern,
   WidgetMode,
 } from '@treatment-builder/shared';
-import { BodySilhouette } from './body-svg';
+import { BodySilhouette, FaceSilhouette } from './body-svg';
 
 interface Props {
   slug: string;
@@ -107,6 +107,9 @@ export function WidgetPreviewClient({ slug }: Props) {
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
+
+  // Diagram view state (body vs face drill-down)
+  const [diagramView, setDiagramView] = useState<'body' | 'face'>('body');
 
   // Phase 3 state
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
@@ -303,6 +306,7 @@ export function WidgetPreviewClient({ slug }: Props) {
 
   function reset() {
     setView('body');
+    setDiagramView('body');
     setGender('female');
     setSelectedRegionSlugs(new Set());
     setSelectedConcernIds(new Set());
@@ -623,16 +627,37 @@ export function WidgetPreviewClient({ slug }: Props) {
 
         {/* Split layout: body left, panel right — stacked on mobile */}
         <div className="flex flex-col sm:flex-row" style={{ minHeight: 600 }}>
-          {/* Left: Body Diagram */}
+          {/* Left: Body / Face Diagram */}
           <div className="flex-1 flex flex-col items-center justify-between py-4 px-2 border-b sm:border-b-0 sm:border-r border-slate-100 max-h-[350px] sm:max-h-none">
+            {diagramView === 'face' && (
+              <button
+                type="button"
+                onClick={() => setDiagramView('body')}
+                className="flex items-center gap-1 self-start ml-2 mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Back to Body
+              </button>
+            )}
+
             <div className="w-full max-w-[220px] flex-1 flex items-center">
-              <BodySilhouette
-                gender={gender}
-                selectedRegionSlugs={selectedRegionSlugs}
-                activeRegionSlugs={activeRegionSlugs}
-                onAnchorClick={handleAnchorClick}
-                primaryColor={primaryColor}
-              />
+              {diagramView === 'body' ? (
+                <BodySilhouette
+                  gender={gender}
+                  selectedRegionSlugs={selectedRegionSlugs}
+                  activeRegionSlugs={activeRegionSlugs}
+                  onAnchorClick={handleAnchorClick}
+                  onFaceClick={() => setDiagramView('face')}
+                  primaryColor={primaryColor}
+                />
+              ) : (
+                <FaceSilhouette
+                  selectedRegionSlugs={selectedRegionSlugs}
+                  activeRegionSlugs={activeRegionSlugs}
+                  onAnchorClick={handleAnchorClick}
+                  primaryColor={primaryColor}
+                />
+              )}
             </div>
 
             {/* Gender toggle */}
@@ -641,6 +666,7 @@ export function WidgetPreviewClient({ slug }: Props) {
                 type="button"
                 onClick={() => {
                   setGender('female');
+                  setDiagramView('body');
                   setSelectedRegionSlugs(new Set());
                   setSelectedConcernIds(new Set());
                 }}
@@ -657,6 +683,7 @@ export function WidgetPreviewClient({ slug }: Props) {
                 type="button"
                 onClick={() => {
                   setGender('male');
+                  setDiagramView('body');
                   setSelectedRegionSlugs(new Set());
                   setSelectedConcernIds(new Set());
                 }}
