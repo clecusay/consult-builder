@@ -183,7 +183,7 @@ export function WidgetPreviewClient({ slug }: Props) {
         <p className="mt-1 text-xs text-muted-foreground">
           Make sure your widget is configured and the tenant is active.
         </p>
-        <Button variant="outline" size="sm" className="mt-4" onClick={loadConfig}>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => loadConfig()}>
           <RefreshCw className="h-4 w-4" />
           Retry
         </Button>
