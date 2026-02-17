@@ -1,0 +1,578 @@
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+} from 'lucide-react';
+import type {
+  WidgetConfigResponse,
+  WidgetConcern,
+  WidgetMode,
+} from '@treatment-builder/shared';
+import { BodySilhouette } from './body-svg';
+
+interface Props {
+  slug: string;
+}
+
+type View = 'body' | 'form' | 'success';
+
+export function WidgetPreviewClient({ slug }: Props) {
+  const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Widget state
+  const [gender, setGender] = useState<'female' | 'male'>('female');
+  const [view, setView] = useState<View>('body');
+  const [selectedRegionSlugs, setSelectedRegionSlugs] = useState<Set<string>>(new Set());
+  const [selectedConcernIds, setSelectedConcernIds] = useState<Set<string>>(new Set());
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const [emailOptIn, setEmailOptIn] = useState(false);
+
+  async function loadConfig(signal?: AbortSignal) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/widget/config?slug=${slug}`, { signal });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Error ${res.status}`);
+        return;
+      }
+      const data = await res.json();
+      if (!signal?.aborted) {
+        setConfig(data);
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError('Failed to fetch widget config');
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadConfig(controller.signal);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
+  // ── Derived data ───────────────────────────────────────────────────
+
+  const widgetMode: WidgetMode = config?.widget_mode ?? 'regions_concerns';
+  const showConcerns = widgetMode.includes('concerns');
+  const showServices = widgetMode.includes('services');
+
+  // Regions for the selected gender
+  const genderRegions = useMemo(() => {
+    if (!config) return [];
+    return config.regions.filter(
+      (r) => r.gender === gender || r.gender === 'all'
+    );
+  }, [config, gender]);
+
+  // Active region slugs (for SVG anchors — what's clickable)
+  const activeRegionSlugs = useMemo(
+    () => new Set(genderRegions.map((r) => r.slug)),
+    [genderRegions]
+  );
+
+  // Selected region objects, sorted alphabetically
+  const selectedRegions = useMemo(
+    () =>
+      genderRegions
+        .filter((r) => selectedRegionSlugs.has(r.slug))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [genderRegions, selectedRegionSlugs]
+  );
+
+  // Concerns from selected regions, grouped by region (sorted alphabetically)
+  const concernsByRegion = useMemo(() => {
+    const grouped: { regionName: string; concerns: (WidgetConcern & { regionSlug: string })[] }[] = [];
+    for (const region of selectedRegions) {
+      if (region.concerns.length > 0) {
+        grouped.push({
+          regionName: region.name,
+          concerns: region.concerns.map((c) => ({ ...c, regionSlug: region.slug })),
+        });
+      }
+    }
+    return grouped;
+  }, [selectedRegions]);
+
+  // Services from selected regions (if mode includes services)
+  const servicesByCategory = useMemo(() => {
+    if (!config) return [];
+    return config.service_categories
+      .filter((cat) => cat.services.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [config]);
+
+  function handleAnchorClick(regionSlugs: string[]) {
+    setSelectedRegionSlugs((prev) => {
+      const next = new Set(prev);
+      // If all slugs in this anchor are already selected, deselect them
+      const allSelected = regionSlugs.every((s) => next.has(s));
+      if (allSelected) {
+        regionSlugs.forEach((s) => next.delete(s));
+      } else {
+        regionSlugs.forEach((s) => next.add(s));
+      }
+      return next;
+    });
+  }
+
+  function toggleConcern(id: string) {
+    setSelectedConcernIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleService(id: string) {
+    setSelectedServiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function reset() {
+    setView('body');
+    setGender('female');
+    setSelectedRegionSlugs(new Set());
+    setSelectedConcernIds(new Set());
+    setSelectedServiceIds(new Set());
+    setSmsOptIn(false);
+    setEmailOptIn(false);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 bg-white">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Loading widget config...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !config) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 bg-white text-center">
+        <AlertCircle className="mb-3 h-10 w-10 text-red-400" />
+        <p className="text-sm font-medium text-red-600">{error || 'No config'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Make sure your widget is configured and the tenant is active.
+        </p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={loadConfig}>
+          <RefreshCw className="h-4 w-4" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const { branding } = config;
+  const primaryColor = branding.primary_color || '#e84393';
+
+  const totalSelections = selectedConcernIds.size + selectedServiceIds.size;
+
+  // ── Success View ────────────────────────────────────────────────────
+  if (view === 'success') {
+    return (
+      <div className="bg-white">
+        <div className="py-16 text-center space-y-4 px-6">
+          <div
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${primaryColor}20` }}
+          >
+            <Check className="h-8 w-8" style={{ color: primaryColor }} />
+          </div>
+          <h2 className="text-lg font-bold">Thank You!</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            {branding.success_message || 'Thank you for your interest! We\'ll be in touch shortly with personalized recommendations.'}
+          </p>
+          <Button variant="outline" size="sm" onClick={reset}>
+            Start Over
+          </Button>
+        </div>
+        <div className="border-t px-6 py-3 text-center">
+          <span className="text-[10px] text-muted-foreground">
+            Powered by Consult Builder
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form View ─────────────────────────────────────────────────────
+  if (view === 'form') {
+    return (
+      <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
+        <div
+          className="px-6 py-4"
+          style={{ backgroundColor: primaryColor, color: '#fff' }}
+        >
+          <h2 className="text-lg font-bold text-center">
+            Complete Your Consultation Request
+          </h2>
+          <p className="text-sm opacity-80 text-center mt-1">
+            Fill in your details and we&apos;ll reach out with personalized recommendations
+          </p>
+        </div>
+
+        <div className="px-6 py-6 max-w-lg mx-auto space-y-4">
+          {/* Standard fields */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">First Name *</label>
+              <Input placeholder="Jane" className="text-sm" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Last Name *</label>
+              <Input placeholder="Doe" className="text-sm" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Email *</label>
+              <Input type="email" placeholder="jane@example.com" className="text-sm" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Phone</label>
+              <Input type="tel" placeholder="(555) 555-5555" className="text-sm" />
+            </div>
+          </div>
+
+          {/* Custom form fields */}
+          {config.form_fields.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {config.form_fields.map((field) => (
+                <div key={field.id} className="space-y-1">
+                  <label className="text-xs font-medium">
+                    {field.label}
+                    {field.is_required && ' *'}
+                  </label>
+                  {field.field_type === 'textarea' ? (
+                    <textarea
+                      placeholder={field.placeholder || ''}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      rows={3}
+                    />
+                  ) : field.field_type === 'select' ? (
+                    <select className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                      <option value="">Select...</option>
+                      {(field.options || []).map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.field_type === 'checkbox' ? (
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" className="rounded" />
+                      <span className="text-sm">{field.placeholder || field.label}</span>
+                    </div>
+                  ) : (
+                    <Input
+                      type={field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text'}
+                      placeholder={field.placeholder || ''}
+                      className="text-sm"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Marketing opt-in */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+            <p className="text-xs font-medium text-slate-700">Communication Preferences</p>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={smsOptIn}
+                onChange={(e) => setSmsOptIn(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                I agree to receive SMS text messages with appointment reminders, promotions,
+                and special offers. Message &amp; data rates may apply. Reply STOP to unsubscribe.
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={emailOptIn}
+                onChange={(e) => setEmailOptIn(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                I would like to receive email updates including exclusive promotions,
+                new treatment announcements, and helpful skincare tips. Unsubscribe anytime.
+              </span>
+            </label>
+          </div>
+
+          {/* Nav */}
+          <div className="flex items-center justify-between pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setView('body')}>
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              onClick={() => setView('success')}
+              style={{ backgroundColor: primaryColor }}
+              className="text-white"
+            >
+              {branding.cta_text || 'Request Consultation'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t px-6 py-3 text-center">
+          <span className="text-[10px] text-muted-foreground">
+            Powered by Consult Builder
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Body Selection View (default) ─────────────────────────────────
+
+  return (
+    <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
+      {/* Header */}
+      <div
+        className="px-6 py-4"
+        style={{ backgroundColor: primaryColor, color: '#fff' }}
+      >
+        {config.tenant.logo_url && (
+          <img
+            src={config.tenant.logo_url}
+            alt={config.tenant.name}
+            className="mx-auto mb-2 h-8 object-contain"
+          />
+        )}
+        <h2 className="text-lg font-bold text-center">
+          {branding.cta_text || 'Build Your Consultation Plan'}
+        </h2>
+        <p className="text-sm opacity-80 text-center mt-1">
+          Select the areas you&apos;d like to address
+        </p>
+      </div>
+
+      {/* Split layout: body left, panel right */}
+      <div className="flex" style={{ minHeight: 600 }}>
+        {/* Left: Body Diagram */}
+        <div className="flex-1 flex flex-col items-center justify-between py-4 px-2 border-r border-slate-100">
+          <div className="w-full max-w-[220px] flex-1 flex items-center">
+            <BodySilhouette
+              gender={gender}
+              selectedRegionSlugs={selectedRegionSlugs}
+              activeRegionSlugs={activeRegionSlugs}
+              onAnchorClick={handleAnchorClick}
+              primaryColor={primaryColor}
+            />
+          </div>
+
+          {/* Gender toggle */}
+          <div className="flex items-center gap-1 mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setGender('female');
+                setSelectedRegionSlugs(new Set());
+                setSelectedConcernIds(new Set());
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                gender === 'female'
+                  ? 'text-white'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+              style={gender === 'female' ? { backgroundColor: primaryColor } : undefined}
+            >
+              Female
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGender('male');
+                setSelectedRegionSlugs(new Set());
+                setSelectedConcernIds(new Set());
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                gender === 'male'
+                  ? 'text-white'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+              style={gender === 'male' ? { backgroundColor: primaryColor } : undefined}
+            >
+              Male
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Concerns / Services Panel */}
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          {selectedRegionSlugs.size === 0 ? (
+            // Empty state
+            <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+              <div className="rounded-full bg-slate-100 p-4 mb-3">
+                <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-slate-700">Select a body area</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tap the <span className="font-semibold">+</span> buttons on the body to see
+                {showConcerns ? ' available concerns' : ' available treatments'}
+              </p>
+            </div>
+          ) : (
+            // Concerns or services list
+            <div className="flex-1 px-4 py-4 space-y-4">
+              {/* Show concerns */}
+              {showConcerns && concernsByRegion.map((group) => (
+                <div key={group.regionName}>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                    {group.regionName}
+                  </h4>
+                  <div className="space-y-1">
+                    {group.concerns.map((concern) => {
+                      const isSelected = selectedConcernIds.has(concern.id);
+                      return (
+                        <button
+                          key={concern.id}
+                          type="button"
+                          onClick={() => toggleConcern(concern.id)}
+                          className={`flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                            isSelected
+                              ? 'border-pink-200 bg-pink-50'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                              isSelected ? '' : 'border border-slate-300'
+                            }`}
+                            style={isSelected ? { backgroundColor: primaryColor } : undefined}
+                          >
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className={isSelected ? 'font-medium' : 'text-slate-700'}>
+                            {concern.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {/* Show services */}
+              {showServices && servicesByCategory.map((cat) => (
+                <div key={cat.id}>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                    {cat.name}
+                  </h4>
+                  <div className="space-y-1">
+                    {cat.services.map((svc) => {
+                      const isSelected = selectedServiceIds.has(svc.id);
+                      return (
+                        <button
+                          key={svc.id}
+                          type="button"
+                          onClick={() => toggleService(svc.id)}
+                          className={`flex items-start gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                            isSelected
+                              ? 'border-pink-200 bg-pink-50'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div
+                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                              isSelected ? '' : 'border border-slate-300'
+                            }`}
+                            style={isSelected ? { backgroundColor: primaryColor } : undefined}
+                          >
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <div>
+                            <span className={`block ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
+                              {svc.name}
+                            </span>
+                            {svc.description && (
+                              <span className="block text-xs text-muted-foreground mt-0.5">
+                                {svc.description}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {/* No concerns/services for selected regions */}
+              {showConcerns && concernsByRegion.length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  No concerns configured for the selected areas.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Continue button (sticky at bottom of right panel) */}
+          {(totalSelections > 0 || selectedRegionSlugs.size > 0) && (
+            <div className="sticky bottom-0 border-t bg-white px-4 py-3">
+              <Button
+                className="w-full text-white"
+                style={{ backgroundColor: primaryColor }}
+                onClick={() => setView('form')}
+              >
+                Continue
+                <ChevronRight className="h-4 w-4 ml-1" />
+                {totalSelections > 0 && (
+                  <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                    {totalSelections}
+                  </span>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t px-6 py-3 flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">
+          Powered by Consult Builder
+        </span>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { reset(); loadConfig(); }}>
+          <RefreshCw className="h-3 w-3" />
+          Reset
+        </Button>
+      </div>
+    </div>
+  );
+}
