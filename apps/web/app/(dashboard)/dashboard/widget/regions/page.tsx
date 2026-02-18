@@ -1,98 +1,101 @@
 import { requireSession } from '@/lib/auth/session';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { RegionsTable, type GroupedRegion } from './regions-table';
+import { ConcernsPanel, type ConcernGroup } from './concerns-panel';
 
-interface BodyRegionRow {
+interface ConcernRow {
   id: string;
-  tenant_id: string | null;
   name: string;
   slug: string;
-  gender: string;
-  body_area: string;
-  display_order: number;
   is_active: boolean;
+  tenant_id: string | null;
+  body_regions: {
+    id: string;
+    name: string;
+    gender: string;
+    body_area: string;
+    is_active: boolean;
+  } | null;
 }
 
-function groupRegions(regions: BodyRegionRow[]): GroupedRegion[] {
-  const map = new Map<string, GroupedRegion>();
+function groupConcerns(concerns: ConcernRow[]): { groups: ConcernGroup[]; total: number; active: number } {
+  const map = new Map<string, ConcernGroup>();
 
-  for (const r of regions) {
-    const key = `${r.slug}-${r.body_area}`;
-    const existing = map.get(key);
+  for (const concern of concerns) {
+    const regionId = concern.body_regions?.id ?? 'unknown';
+    const regionName = concern.body_regions?.name ?? 'Unknown Region';
+    const regionGender = concern.body_regions?.gender ?? 'all';
+    const regionArea = concern.body_regions?.body_area ?? 'body';
+    const regionIsActive = concern.body_regions?.is_active ?? true;
 
-    if (existing) {
-      if (r.gender === 'female') {
-        existing.woman = r.is_active;
-        existing.womanId = r.id;
-      }
-      if (r.gender === 'male') {
-        existing.man = r.is_active;
-        existing.manId = r.id;
-      }
-      if (r.gender === 'all') {
-        existing.woman = r.is_active;
-        existing.man = r.is_active;
-        existing.womanId = r.id;
-        existing.manId = r.id;
-      }
-    } else {
-      map.set(key, {
-        name: r.name,
-        slug: r.slug,
-        body_area: r.body_area,
-        display_order: r.display_order,
-        woman: (r.gender === 'female' || r.gender === 'all') && r.is_active,
-        man: (r.gender === 'male' || r.gender === 'all') && r.is_active,
-        womanId: r.gender === 'female' || r.gender === 'all' ? r.id : null,
-        manId: r.gender === 'male' || r.gender === 'all' ? r.id : null,
+    if (!map.has(regionId)) {
+      map.set(regionId, {
+        regionId,
+        regionName,
+        regionGender,
+        regionArea,
+        regionIsActive,
+        concerns: [],
       });
     }
+    map.get(regionId)!.concerns.push({
+      id: concern.id,
+      name: concern.name,
+      slug: concern.slug,
+      is_active: concern.is_active,
+      tenant_id: concern.tenant_id,
+    });
   }
 
-  return Array.from(map.values()).sort((a, b) => a.display_order - b.display_order);
+  return {
+    groups: Array.from(map.values()),
+    total: concerns.length,
+    active: concerns.filter((c) => c.is_active).length,
+  };
 }
 
-export default async function BodyRegionsPage() {
+export default async function RegionsPage() {
   const session = await requireSession();
   const supabase = await createServerSupabaseClient();
 
-  const { data: regions } = await supabase
-    .from('body_regions')
-    .select('id, tenant_id, name, slug, gender, body_area, display_order, is_active')
+  const { data: concerns } = await supabase
+    .from('concerns')
+    .select(
+      `
+      id,
+      name,
+      slug,
+      is_active,
+      tenant_id,
+      body_regions (
+        id,
+        name,
+        gender,
+        body_area,
+        is_active
+      )
+    `
+    )
     .or(`tenant_id.eq.${session.profile.tenant_id},tenant_id.is.null`)
     .order('display_order', { ascending: true });
 
-  const allRegions = (regions ?? []) as BodyRegionRow[];
-  const grouped = groupRegions(allRegions);
+  const { groups: concernGroups, total: totalConcerns, active: activeConcerns } = groupConcerns(
+    (concerns ?? []) as unknown as ConcernRow[]
+  );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Body Regions</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Regions</h1>
         <p className="text-muted-foreground">
-          Manage the body areas available in your widget
+          Manage body regions and concerns for your widget
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Regions</CardTitle>
-          <CardDescription>
-            {grouped.length} unique region{grouped.length !== 1 ? 's' : ''} configured.
-            Toggle Woman / Man to control which genders see each region.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RegionsTable initialRegions={grouped} />
-        </CardContent>
-      </Card>
+      <ConcernsPanel
+        groups={concernGroups}
+        totalConcerns={totalConcerns}
+        activeConcerns={activeConcerns}
+      />
     </div>
   );
 }
