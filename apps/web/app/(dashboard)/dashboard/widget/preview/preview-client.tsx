@@ -110,6 +110,7 @@ export function WidgetPreviewClient({ slug }: Props) {
 
   // Diagram view state (body vs face drill-down)
   const [diagramView, setDiagramView] = useState<'body' | 'face'>('body');
+  const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
 
   // Phase 3 state
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
@@ -307,6 +308,7 @@ export function WidgetPreviewClient({ slug }: Props) {
   function reset() {
     setView('body');
     setDiagramView('body');
+    setBodySide('front');
     setGender('female');
     setSelectedRegionSlugs(new Set());
     setSelectedConcernIds(new Set());
@@ -640,10 +642,54 @@ export function WidgetPreviewClient({ slug }: Props) {
               </button>
             )}
 
-            <div className="w-full max-w-[220px] flex-1 flex items-center">
+            <div className="relative w-full max-w-[220px] flex-1 flex items-center">
+              {/* Front/Back icon tabs — overlaid top-right of diagram */}
+              {diagramView !== 'face' && (
+                <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setBodySide('front')}
+                    className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
+                      bodySide === 'front'
+                        ? 'text-white border-transparent shadow-sm'
+                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
+                    }`}
+                    style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="5" r="3" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="8" y1="12" x2="16" y2="12" />
+                      <line x1="12" y1="16" x2="8" y2="22" />
+                      <line x1="12" y1="16" x2="16" y2="22" />
+                    </svg>
+                    Front
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBodySide('back')}
+                    className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
+                      bodySide === 'back'
+                        ? 'text-white border-transparent shadow-sm'
+                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
+                    }`}
+                    style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="5" r="3" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="12" y1="16" x2="8" y2="22" />
+                      <line x1="12" y1="16" x2="16" y2="22" />
+                    </svg>
+                    Back
+                  </button>
+                </div>
+              )}
+
               {diagramView === 'body' ? (
                 <BodySilhouette
                   gender={gender}
+                  bodySide={bodySide}
                   selectedRegionSlugs={selectedRegionSlugs}
                   activeRegionSlugs={activeRegionSlugs}
                   onAnchorClick={handleAnchorClick}
@@ -667,6 +713,7 @@ export function WidgetPreviewClient({ slug }: Props) {
                 onClick={() => {
                   setGender('female');
                   setDiagramView('body');
+                  setBodySide('front');
                   setSelectedRegionSlugs(new Set());
                   setSelectedConcernIds(new Set());
                 }}
@@ -684,6 +731,7 @@ export function WidgetPreviewClient({ slug }: Props) {
                 onClick={() => {
                   setGender('male');
                   setDiagramView('body');
+                  setBodySide('front');
                   setSelectedRegionSlugs(new Set());
                   setSelectedConcernIds(new Set());
                 }}

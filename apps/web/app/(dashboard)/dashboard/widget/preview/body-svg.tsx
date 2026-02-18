@@ -1,7 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { FEMALE_SILHOUETTE_PATH, MALE_SILHOUETTE_PATH } from './silhouette-paths';
+import {
+  FEMALE_SILHOUETTE_PATH,
+  MALE_SILHOUETTE_PATH,
+  FEMALE_BACK_SILHOUETTE_PATH,
+  MALE_BACK_SILHOUETTE_PATH,
+} from './silhouette-paths';
 
 // ── Anchor definitions ──────────────────────────────────────────────────────
 
@@ -41,6 +46,18 @@ const MALE_ANCHORS: BodyAnchor[] = [
   { id: 'lower-legs', label: 'Lower Legs', x: 75, y: 520, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
+// Female back view — 200 x 665
+const FEMALE_BACK_ANCHORS: BodyAnchor[] = [
+  { id: 'back', label: 'Back', x: 100, y: 185, labelSide: 'right', regionSlugs: ['back'] },
+  { id: 'buttocks', label: 'Buttocks', x: 100, y: 330, labelSide: 'right', regionSlugs: ['buttocks'] },
+];
+
+// Male back view — 200 x 608
+const MALE_BACK_ANCHORS: BodyAnchor[] = [
+  { id: 'back', label: 'Back', x: 100, y: 175, labelSide: 'right', regionSlugs: ['back'] },
+  { id: 'buttocks', label: 'Buttocks', x: 100, y: 310, labelSide: 'right', regionSlugs: ['buttocks'] },
+];
+
 // Region-appropriate highlight radii
 function getHighlightRadius(anchorId: string): number {
   switch (anchorId) {
@@ -52,6 +69,8 @@ function getHighlightRadius(anchorId: string): number {
     case 'arms': return 32;
     case 'hands': return 22;
     case 'intimate': return 28;
+    case 'back': return 45;
+    case 'buttocks': return 38;
     case 'thighs': return 45;
     case 'lower-legs': return 40;
     default: return 30;
@@ -62,6 +81,7 @@ function getHighlightRadius(anchorId: string): number {
 
 interface BodySilhouetteProps {
   gender: 'female' | 'male';
+  bodySide?: 'front' | 'back';
   selectedRegionSlugs: Set<string>;
   activeRegionSlugs: Set<string>;
   onAnchorClick: (regionSlugs: string[]) => void;
@@ -72,6 +92,7 @@ interface BodySilhouetteProps {
 
 export function BodySilhouette({
   gender,
+  bodySide = 'front',
   selectedRegionSlugs,
   activeRegionSlugs,
   onAnchorClick,
@@ -79,8 +100,14 @@ export function BodySilhouette({
   onFaceClick,
   primaryColor = '#e84393',
 }: BodySilhouetteProps) {
-  const path = gender === 'female' ? FEMALE_SILHOUETTE_PATH : MALE_SILHOUETTE_PATH;
-  const anchors = gender === 'female' ? FEMALE_ANCHORS : MALE_ANCHORS;
+  const path = bodySide === 'back'
+    ? (gender === 'female' ? FEMALE_BACK_SILHOUETTE_PATH : MALE_BACK_SILHOUETTE_PATH)
+    : (gender === 'female' ? FEMALE_SILHOUETTE_PATH : MALE_SILHOUETTE_PATH);
+
+  const anchors = bodySide === 'back'
+    ? (gender === 'female' ? FEMALE_BACK_ANCHORS : MALE_BACK_ANCHORS)
+    : (gender === 'female' ? FEMALE_ANCHORS : MALE_ANCHORS);
+
   const viewBoxH = gender === 'female' ? 685 : 628;
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -266,7 +293,7 @@ export function BodySilhouette({
   );
 }
 
-export { FEMALE_ANCHORS, MALE_ANCHORS };
+export { FEMALE_ANCHORS, MALE_ANCHORS, FEMALE_BACK_ANCHORS, MALE_BACK_ANCHORS };
 
 // ── Face Silhouette ──────────────────────────────────────────────────────
 
