@@ -12,7 +12,6 @@ import {
   BarChart3,
   Code,
   Eye,
-  Globe,
   Webhook,
   Layers,
   FormInput,
@@ -54,7 +53,6 @@ export function AppSidebar({ role, tenantName }: AppSidebarProps) {
   const widgetItems = [
     { title: 'Widget Flow', href: '/dashboard/widget/flow', icon: GitBranch },
     { title: 'Branding', href: '/dashboard/widget/branding', icon: Palette },
-    { title: 'Diagram', href: '/dashboard/widget/diagram', icon: Globe },
     { title: 'Regions', href: '/dashboard/widget/regions', icon: Layers },
     { title: 'Services', href: '/dashboard/widget/services', icon: Stethoscope },
     { title: 'Form Fields', href: '/dashboard/widget/form', icon: FormInput },
