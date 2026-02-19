@@ -6,6 +6,8 @@ const API_BASE = '__API_BASE__'; // Replaced at build time or configured
 class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
   private config: WidgetConfigResponse | null = null;
+  private locationId: string | null = null;
+  private flowOverride: string | null = null;
 
   constructor() {
     super();
@@ -18,6 +20,12 @@ class TreatmentBuilderWidget extends HTMLElement {
       this.shadow.innerHTML = '<p style="color:red;">Missing data-tenant attribute</p>';
       return;
     }
+
+    // Read optional location pin
+    this.locationId = this.getAttribute('data-location') || null;
+
+    // Read optional flow override
+    this.flowOverride = this.getAttribute('data-flow') || null;
 
     // Show loading skeleton
     this.shadow.innerHTML = `
@@ -39,7 +47,14 @@ class TreatmentBuilderWidget extends HTMLElement {
 
     try {
       const apiBase = this.getAttribute('data-api') || (API_BASE !== '__API_BASE__' ? API_BASE : '');
-      const res = await fetch(`${apiBase}/api/widget/config?slug=${encodeURIComponent(tenantSlug)}`);
+      let configUrl = `${apiBase}/api/widget/config?slug=${encodeURIComponent(tenantSlug)}`;
+      if (this.locationId) {
+        configUrl += `&location=${encodeURIComponent(this.locationId)}`;
+      }
+      if (this.flowOverride) {
+        configUrl += `&flow=${encodeURIComponent(this.flowOverride)}`;
+      }
+      const res = await fetch(configUrl);
       if (!res.ok) throw new Error(`Failed to load config: ${res.status}`);
       this.config = await res.json();
       this.render();

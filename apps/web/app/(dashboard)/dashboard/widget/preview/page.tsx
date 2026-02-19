@@ -10,8 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Code2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { WidgetPreviewClient } from './preview-client';
 import { PreviewErrorBoundary } from './preview-error-boundary';
+import { PreviewWithFlowSelector } from './preview-with-flow-selector';
 
 export default async function WidgetPreviewPage() {
   const session = await requireSession();
@@ -47,41 +47,21 @@ export default async function WidgetPreviewPage() {
         </div>
       </div>
 
-      {/* Browser Preview Frame */}
-      <Card className="py-0 overflow-hidden">
-          {/* Mock Browser Chrome */}
-          <div className="rounded-t-xl border-b bg-slate-100 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-red-400" />
-                <div className="h-3 w-3 rounded-full bg-yellow-400" />
-                <div className="h-3 w-3 rounded-full bg-green-400" />
-              </div>
-              <div className="flex-1">
-                <div className="mx-auto max-w-md rounded-md border bg-white px-3 py-1.5 text-center text-xs text-muted-foreground">
-                  yourwebsite.com — preview of{' '}
-                  <span className="font-mono font-medium">{slug}</span>
-                </div>
+      {/* Browser Preview Frame with Flow Selector */}
+      <PreviewErrorBoundary>
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-24 bg-white">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Loading widget preview...</span>
               </div>
             </div>
-          </div>
-
-          {/* Live Preview Area */}
-          <PreviewErrorBoundary>
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center py-24 bg-white">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="text-sm">Loading widget preview...</span>
-                  </div>
-                </div>
-              }
-            >
-              <WidgetPreviewClient slug={slug} />
-            </Suspense>
-          </PreviewErrorBoundary>
-      </Card>
+          }
+        >
+          <PreviewWithFlowSelector slug={slug} />
+        </Suspense>
+      </PreviewErrorBoundary>
 
       {/* Quick Links */}
       <div className="grid gap-4 sm:grid-cols-3">

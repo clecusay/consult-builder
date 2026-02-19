@@ -17,9 +17,9 @@ import {
   ArrowRight,
   Layers,
   MessageSquare,
-  List,
   GitBranch,
 } from 'lucide-react';
+import { logAuditClient } from '@/lib/audit/client';
 
 type WidgetMode =
   | 'regions_concerns_services'
@@ -61,15 +61,7 @@ const flowOptions: FlowOption[] = [
     icon: MessageSquare,
     steps: ['Body Region', 'Concerns', 'Form'],
   },
-  {
-    mode: 'concerns_only',
-    label: 'Quick Concerns',
-    description:
-      'Visitors choose from a list of concerns without a body diagram. Simplest flow for basic lead capture.',
-    icon: List,
-    steps: ['Concerns', 'Form'],
-  },
-  {
+{
     mode: 'services_only',
     label: 'Service Menu',
     description:
@@ -132,6 +124,12 @@ export default function WidgetFlowPage() {
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+
+    logAuditClient({
+      action: 'widget_config.flow_updated',
+      entity_type: 'widget_config',
+      new_data: { widget_mode: selected },
+    });
   }
 
   if (loading) {

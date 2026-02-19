@@ -37,6 +37,8 @@ import { BodySilhouette, FaceSilhouette } from './body-svg';
 
 interface Props {
   slug: string;
+  locationId?: string | null;
+  widgetModeOverride?: WidgetMode | null;
 }
 
 type View = 'body' | 'form' | 'success';
@@ -46,7 +48,7 @@ type View = 'body' | 'form' | 'success';
 function StepIndicator({ currentStep, primaryColor }: { currentStep: number; primaryColor: string }) {
   const steps = ['Select Areas', 'Your Concerns', 'Your Info'];
   return (
-    <div className="flex items-center justify-center gap-0 py-3 px-4">
+    <div className="flex items-center justify-center gap-0 py-2 px-4">
       {steps.map((label, i) => {
         const isActive = i === currentStep;
         const isCompleted = i < currentStep;
@@ -54,24 +56,24 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
           <div key={label} className="flex items-center">
             {i > 0 && (
               <div
-                className="h-[2px] w-6"
+                className="h-[2px] w-5"
                 style={{ backgroundColor: isCompleted ? primaryColor : '#e2e8f0' }}
               />
             )}
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-0.5">
               <div
                 className="flex items-center justify-center rounded-full transition-all duration-200"
                 style={{
-                  width: isActive ? 28 : 20,
-                  height: isActive ? 28 : 20,
+                  width: isActive ? 24 : 18,
+                  height: isActive ? 24 : 18,
                   backgroundColor: isActive || isCompleted ? primaryColor : '#e2e8f0',
                 }}
               >
                 {isCompleted ? (
-                  <Check className="h-3 w-3 text-white" />
+                  <Check className="h-2.5 w-2.5 text-white" />
                 ) : (
                   <span
-                    className="text-[10px] font-bold"
+                    className="text-[9px] font-bold"
                     style={{ color: isActive ? 'white' : '#94a3b8' }}
                   >
                     {i + 1}
@@ -79,7 +81,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
                 )}
               </div>
               <span
-                className="text-[9px] font-medium whitespace-nowrap"
+                className="text-[8px] font-medium whitespace-nowrap"
                 style={{ color: isActive ? primaryColor : '#94a3b8' }}
               >
                 {label}
@@ -94,7 +96,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function WidgetPreviewClient({ slug }: Props) {
+export function WidgetPreviewClient({ slug, locationId: pinnedLocationId, widgetModeOverride }: Props) {
   const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +107,7 @@ export function WidgetPreviewClient({ slug }: Props) {
   const [selectedRegionSlugs, setSelectedRegionSlugs] = useState<Set<string>>(new Set());
   const [selectedConcernIds, setSelectedConcernIds] = useState<Set<string>>(new Set());
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(pinnedLocationId ?? null);
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 
@@ -120,6 +123,21 @@ export function WidgetPreviewClient({ slug }: Props) {
   // Phase 5 state — mobile
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSheetRegion, setMobileSheetRegion] = useState<string | null>(null);
+
+  // Reset widget state when flow mode changes
+  useEffect(() => {
+    if (widgetModeOverride != null) {
+      setView('body');
+      setDiagramView('body');
+      setBodySide('front');
+      setSelectedRegionSlugs(new Set());
+      setSelectedConcernIds(new Set());
+      setSelectedServiceIds(new Set());
+      setExpandedRegions(new Set());
+      setConcernSearchQuery('');
+      setMobileSheetRegion(null);
+    }
+  }, [widgetModeOverride]);
 
   // Mobile detection
   useEffect(() => {
@@ -166,7 +184,7 @@ export function WidgetPreviewClient({ slug }: Props) {
 
   // ── Derived data ───────────────────────────────────────────────────
 
-  const widgetMode: WidgetMode = config?.widget_mode ?? 'regions_concerns';
+  const widgetMode: WidgetMode = widgetModeOverride ?? config?.widget_mode ?? 'regions_concerns';
   const showConcerns = widgetMode.includes('concerns');
   const showServices = widgetMode.includes('services');
 
@@ -313,6 +331,7 @@ export function WidgetPreviewClient({ slug }: Props) {
     setSelectedRegionSlugs(new Set());
     setSelectedConcernIds(new Set());
     setSelectedServiceIds(new Set());
+    setSelectedLocationId(pinnedLocationId ?? null);
     setSmsOptIn(false);
     setEmailOptIn(false);
     setExpandedRegions(new Set());
@@ -398,19 +417,19 @@ export function WidgetPreviewClient({ slug }: Props) {
         key={concern.id}
         type="button"
         onClick={() => toggleConcern(concern.id)}
-        className={`flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+        className={`flex items-center gap-1.5 w-full rounded-md border px-2.5 py-1.5 text-left text-xs transition-all ${
           isSelected
             ? 'border-pink-200 bg-pink-50'
             : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
         <div
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded ${
             isSelected ? '' : 'border border-slate-300'
           }`}
           style={isSelected ? { backgroundColor: primaryColor } : undefined}
         >
-          {isSelected && <Check className="h-3 w-3 text-white" />}
+          {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
         </div>
         <span className={`flex-1 ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
           {concern.name}
@@ -441,14 +460,14 @@ export function WidgetPreviewClient({ slug }: Props) {
   if (view === 'success') {
     return (
       <div className="bg-white">
-        <div className="py-16 text-center space-y-4 px-6">
+        <div className="py-10 text-center space-y-3 px-4">
           <div
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full"
             style={{ backgroundColor: `${primaryColor}20` }}
           >
-            <Check className="h-8 w-8" style={{ color: primaryColor }} />
+            <Check className="h-6 w-6" style={{ color: primaryColor }} />
           </div>
-          <h2 className="text-lg font-bold">Thank You!</h2>
+          <h2 className="text-base font-bold">Thank You!</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             {branding.success_message || 'Thank you for your interest! We\'ll be in touch shortly with personalized recommendations.'}
           </p>
@@ -456,7 +475,7 @@ export function WidgetPreviewClient({ slug }: Props) {
             Start Over
           </Button>
         </div>
-        <div className="border-t px-6 py-3 text-center">
+        <div className="border-t px-4 py-2 text-center">
           <span className="text-[10px] text-muted-foreground">
             Powered by Consult Builder
           </span>
@@ -470,45 +489,45 @@ export function WidgetPreviewClient({ slug }: Props) {
     return (
       <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
         <div
-          className="px-6 py-4"
+          className="px-4 py-3"
           style={{ backgroundColor: primaryColor, color: '#fff' }}
         >
-          <h2 className="text-lg font-bold text-center">
+          <h2 className="text-base font-bold text-center">
             Complete Your Consultation Request
           </h2>
-          <p className="text-sm opacity-80 text-center mt-1">
+          <p className="text-xs opacity-80 text-center mt-0.5">
             Fill in your details and we&apos;ll reach out with personalized recommendations
           </p>
         </div>
 
         <StepIndicator currentStep={2} primaryColor={primaryColor} />
 
-        <div className="px-6 py-6 max-w-lg mx-auto space-y-4">
+        <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
           {/* Standard fields */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-0.5">
               <label className="text-xs font-medium">First Name *</label>
-              <Input placeholder="Jane" className="text-sm" />
+              <Input placeholder="Jane" className="text-sm h-8" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <label className="text-xs font-medium">Last Name *</label>
-              <Input placeholder="Doe" className="text-sm" />
+              <Input placeholder="Doe" className="text-sm h-8" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <label className="text-xs font-medium">Email *</label>
-              <Input type="email" placeholder="jane@example.com" className="text-sm" />
+              <Input type="email" placeholder="jane@example.com" className="text-sm h-8" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <label className="text-xs font-medium">Phone</label>
-              <Input type="tel" placeholder="(555) 555-5555" className="text-sm" />
+              <Input type="tel" placeholder="(555) 555-5555" className="text-sm h-8" />
             </div>
           </div>
 
           {/* Custom form fields */}
           {config.form_fields.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {config.form_fields.map((field) => (
-                <div key={field.id} className="space-y-1">
+                <div key={field.id} className="space-y-0.5">
                   <label className="text-xs font-medium">
                     {field.label}
                     {field.is_required && ' *'}
@@ -516,11 +535,11 @@ export function WidgetPreviewClient({ slug }: Props) {
                   {field.field_type === 'textarea' ? (
                     <textarea
                       placeholder={field.placeholder || ''}
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                      rows={3}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-sm"
+                      rows={2}
                     />
                   ) : field.field_type === 'select' ? (
-                    <select className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                    <select className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                       <option value="">Select...</option>
                       {(field.options || []).map((opt) => (
                         <option key={opt} value={opt}>
@@ -537,7 +556,7 @@ export function WidgetPreviewClient({ slug }: Props) {
                     <Input
                       type={field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text'}
                       placeholder={field.placeholder || ''}
-                      className="text-sm"
+                      className="text-sm h-8"
                     />
                   )}
                 </div>
@@ -545,29 +564,48 @@ export function WidgetPreviewClient({ slug }: Props) {
             </div>
           )}
 
+          {/* Location selector — only when not pinned and tenant has locations */}
+          {!pinnedLocationId && config.locations.length >= 2 && (
+            <div className="space-y-0.5">
+              <label className="text-xs font-medium">Location *</label>
+              <select
+                value={selectedLocationId ?? ''}
+                onChange={(e) => setSelectedLocationId(e.target.value || null)}
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+              >
+                <option value="">Select a location...</option>
+                {config.locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}{loc.city && loc.state ? ` — ${loc.city}, ${loc.state}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Marketing opt-in */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-2">
             <p className="text-xs font-medium text-slate-700">Communication Preferences</p>
-            <label className="flex items-start gap-2.5 cursor-pointer">
+            <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={smsOptIn}
                 onChange={(e) => setSmsOptIn(e.target.checked)}
                 className="mt-0.5 rounded border-slate-300"
               />
-              <span className="text-xs text-slate-600 leading-relaxed">
+              <span className="text-[11px] text-slate-600 leading-snug">
                 I agree to receive SMS text messages with appointment reminders, promotions,
                 and special offers. Message &amp; data rates may apply. Reply STOP to unsubscribe.
               </span>
             </label>
-            <label className="flex items-start gap-2.5 cursor-pointer">
+            <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={emailOptIn}
                 onChange={(e) => setEmailOptIn(e.target.checked)}
                 className="mt-0.5 rounded border-slate-300"
               />
-              <span className="text-xs text-slate-600 leading-relaxed">
+              <span className="text-[11px] text-slate-600 leading-snug">
                 I would like to receive email updates including exclusive promotions,
                 new treatment announcements, and helpful skincare tips. Unsubscribe anytime.
               </span>
@@ -575,12 +613,13 @@ export function WidgetPreviewClient({ slug }: Props) {
           </div>
 
           {/* Nav */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <Button variant="ghost" size="sm" onClick={() => setView('body')}>
               <ChevronLeft className="h-4 w-4" />
               Back
             </Button>
             <Button
+              size="sm"
               onClick={() => setView('success')}
               style={{ backgroundColor: primaryColor }}
               className="text-white"
@@ -590,7 +629,7 @@ export function WidgetPreviewClient({ slug }: Props) {
           </div>
         </div>
 
-        <div className="border-t px-6 py-3 text-center">
+        <div className="border-t px-4 py-2 text-center">
           <span className="text-[10px] text-muted-foreground">
             Powered by Consult Builder
           </span>
@@ -606,20 +645,20 @@ export function WidgetPreviewClient({ slug }: Props) {
       <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
         {/* Header */}
         <div
-          className="px-6 py-4"
+          className="px-4 py-3"
           style={{ backgroundColor: primaryColor, color: '#fff' }}
         >
           {config.tenant.logo_url && (
             <img
               src={config.tenant.logo_url}
               alt={config.tenant.name}
-              className="mx-auto mb-2 h-8 object-contain"
+              className="mx-auto mb-1.5 h-7 object-contain"
             />
           )}
-          <h2 className="text-lg font-bold text-center">
+          <h2 className="text-base font-bold text-center">
             {branding.cta_text || 'Build Your Consultation Plan'}
           </h2>
-          <p className="text-sm opacity-80 text-center mt-1">
+          <p className="text-xs opacity-80 text-center mt-0.5">
             Select the areas you&apos;d like to address
           </p>
         </div>
@@ -628,9 +667,9 @@ export function WidgetPreviewClient({ slug }: Props) {
         <StepIndicator currentStep={currentStep} primaryColor={primaryColor} />
 
         {/* Split layout: body left, panel right — stacked on mobile */}
-        <div className="flex flex-col sm:flex-row" style={{ minHeight: 600 }}>
+        <div className="flex flex-col sm:flex-row" style={{ minHeight: 460 }}>
           {/* Left: Body / Face Diagram */}
-          <div className="flex-1 flex flex-col items-center justify-between py-4 px-2 border-b sm:border-b-0 sm:border-r border-slate-100 max-h-[350px] sm:max-h-none">
+          <div className="flex-1 flex flex-col items-center justify-between py-2 px-2 border-b sm:border-b-0 sm:border-r border-slate-100 max-h-[320px] sm:max-h-none">
             {diagramView === 'face' && (
               <button
                 type="button"
@@ -642,7 +681,7 @@ export function WidgetPreviewClient({ slug }: Props) {
               </button>
             )}
 
-            <div className="relative w-full max-w-[220px] flex-1 flex items-center">
+            <div className="relative w-full max-w-[200px] flex-1 flex items-center">
               {/* Front/Back icon tabs — overlaid top-right of diagram */}
               {diagramView !== 'face' && (
                 <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
@@ -707,7 +746,7 @@ export function WidgetPreviewClient({ slug }: Props) {
             </div>
 
             {/* Gender toggle */}
-            <div className="flex items-center gap-1 mt-3">
+            <div className="flex items-center gap-1 mt-2">
               <button
                 type="button"
                 onClick={() => {
@@ -760,30 +799,30 @@ export function WidgetPreviewClient({ slug }: Props) {
           <div ref={rightPanelRef} className="flex-1 hidden sm:flex flex-col overflow-y-auto">
             {selectedRegionSlugs.size === 0 ? (
               // Empty state
-              <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-                <div className="rounded-full bg-slate-100 p-4 mb-3">
-                  <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+                <div className="rounded-full bg-slate-100 p-3 mb-2">
+                  <svg className="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-slate-700">Select a body area</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs font-medium text-slate-700">Select a body area</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   Tap the <span className="font-semibold">+</span> buttons on the body to see
                   {showConcerns ? ' available concerns' : ' available treatments'}
                 </p>
               </div>
             ) : (
               // Concerns or services list
-              <div className="flex-1 px-4 py-4 space-y-1">
+              <div className="flex-1 px-3 py-3 space-y-1">
                 {/* Search filter */}
                 {showConcerns && selectedRegionSlugs.size > 0 && (
-                  <div className="relative mb-3">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
                     <Input
                       value={concernSearchQuery}
                       onChange={(e) => setConcernSearchQuery(e.target.value)}
                       placeholder="Search concerns..."
-                      className="text-sm pl-8 h-8"
+                      className="text-xs pl-7 h-7"
                     />
                     {concernSearchQuery && (
                       <button
@@ -872,26 +911,26 @@ export function WidgetPreviewClient({ slug }: Props) {
                             key={svc.id}
                             type="button"
                             onClick={() => toggleService(svc.id)}
-                            className={`flex items-start gap-2 w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                            className={`flex items-start gap-1.5 w-full rounded-md border px-2.5 py-1.5 text-left text-xs transition-all ${
                               isSelected
                                 ? 'border-pink-200 bg-pink-50'
                                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                             }`}
                           >
                             <div
-                              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                              className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded ${
                                 isSelected ? '' : 'border border-slate-300'
                               }`}
                               style={isSelected ? { backgroundColor: primaryColor } : undefined}
                             >
-                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                              {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
                             </div>
                             <div>
                               <span className={`block ${isSelected ? 'font-medium' : 'text-slate-700'}`}>
                                 {svc.name}
                               </span>
                               {svc.description && (
-                                <span className="block text-xs text-muted-foreground mt-0.5">
+                                <span className="block text-[11px] text-muted-foreground mt-0.5">
                                   {svc.description}
                                 </span>
                               )}
@@ -914,19 +953,19 @@ export function WidgetPreviewClient({ slug }: Props) {
 
             {/* Floating summary bar */}
             {(totalSelections > 0 || selectedRegionSlugs.size > 0) && (
-              <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 flex-1">
+              <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 flex-1">
                     {selectedRegionSlugs.size} area{selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; {totalSelections} concern{totalSelections !== 1 ? 's' : ''} selected
                   </span>
                   <Button
-                    className="text-white"
+                    className="text-white h-7 text-xs"
                     size="sm"
                     style={{ backgroundColor: primaryColor }}
                     onClick={() => setView('form')}
                   >
                     Continue
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
                   </Button>
                 </div>
               </div>
@@ -936,19 +975,19 @@ export function WidgetPreviewClient({ slug }: Props) {
 
         {/* Mobile: floating continue bar */}
         {isMobile && (totalSelections > 0 || selectedRegionSlugs.size > 0) && (
-          <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-4 py-3 sm:hidden">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-500 flex-1">
+          <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur-sm px-3 py-2 sm:hidden">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500 flex-1">
                 {selectedRegionSlugs.size} area{selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; {totalSelections} concern{totalSelections !== 1 ? 's' : ''} selected
               </span>
               <Button
-                className="text-white"
+                className="text-white h-7 text-xs"
                 size="sm"
                 style={{ backgroundColor: primaryColor }}
                 onClick={() => setView('form')}
               >
                 Continue
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
               </Button>
             </div>
           </div>
@@ -976,12 +1015,12 @@ export function WidgetPreviewClient({ slug }: Props) {
         </Sheet>
 
         {/* Footer */}
-        <div className="border-t px-6 py-3 flex items-center justify-between">
+        <div className="border-t px-4 py-1.5 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">
             Powered by Consult Builder
           </span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { reset(); loadConfig(); }}>
-            <RefreshCw className="h-3 w-3" />
+          <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { reset(); loadConfig(); }}>
+            <RefreshCw className="h-2.5 w-2.5" />
             Reset
           </Button>
         </div>

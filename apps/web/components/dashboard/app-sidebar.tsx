@@ -19,7 +19,6 @@ import {
   ScrollText,
   Building2,
   Stethoscope,
-  GitBranch,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -51,10 +50,9 @@ export function AppSidebar({ role, tenantName }: AppSidebarProps) {
   ];
 
   const widgetItems = [
-    { title: 'Widget Flow', href: '/dashboard/widget/flow', icon: GitBranch },
     { title: 'Branding', href: '/dashboard/widget/branding', icon: Palette },
-    { title: 'Regions', href: '/dashboard/widget/regions', icon: Layers },
     { title: 'Services', href: '/dashboard/widget/services', icon: Stethoscope },
+    { title: 'Regions', href: '/dashboard/widget/regions', icon: Layers },
     { title: 'Form Fields', href: '/dashboard/widget/form', icon: FormInput },
     { title: 'Integration', href: '/dashboard/widget/integration', icon: Webhook },
     { title: 'Preview', href: '/dashboard/widget/preview', icon: Eye },
