@@ -227,11 +227,19 @@ export function ConcernsPanel({ groups, totalConcerns, activeConcerns }: Props) 
                 const selected = region.key === selectedKey;
                 const anyActive = region.variants.some((v) => v.isActive);
                 return (
-                  <button
+                  <div
                     key={region.key}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedKey(region.key)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedKey(region.key);
+                      }
+                    }}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm transition-colors',
+                      'flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm transition-colors cursor-pointer',
                       selected
                         ? 'bg-accent text-accent-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -258,7 +266,7 @@ export function ConcernsPanel({ groups, totalConcerns, activeConcerns }: Props) 
                       onClick={(e) => e.stopPropagation()}
                       className="scale-75 shrink-0"
                     />
-                  </button>
+                  </div>
                 );
               })}
             </div>

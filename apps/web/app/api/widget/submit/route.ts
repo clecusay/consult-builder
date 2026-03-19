@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid submission', details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       .single();
 
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
     // Get widget config for webhook
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('Failed to save submission:', insertError);
-      return NextResponse.json({ error: 'Failed to save submission' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to save submission' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
     // Fire webhook (non-blocking)
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       }
     );
   } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }
 
