@@ -116,6 +116,7 @@ export type FormFieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' |
 export interface FormField {
   id: string;
   tenant_id: string;
+  field_key: string | null;
   field_type: FormFieldType;
   label: string;
   placeholder: string | null;
@@ -139,6 +140,7 @@ export interface FormSubmission {
   gender: Gender;
   selected_regions: SelectedRegion[];
   selected_concerns: SelectedConcern[];
+  selected_services: SelectedService[];
   custom_fields: Record<string, unknown>;
   source_url: string | null;
   lead_status: LeadStatus;
@@ -160,6 +162,12 @@ export interface SelectedConcern {
   concern_name: string;
   region_id: string;
   region_name: string;
+}
+
+export interface SelectedService {
+  service_id: string;
+  service_name: string;
+  category_name: string;
 }
 
 // --- Service Category ---
@@ -304,6 +312,7 @@ export interface WidgetConcern {
 
 export interface WidgetFormField {
   id: string;
+  field_key: string | null;
   field_type: FormFieldType;
   label: string;
   placeholder: string | null;
@@ -315,13 +324,16 @@ export interface WidgetFormField {
 // --- Widget Submission Payload ---
 export interface WidgetSubmissionPayload {
   tenant_slug: string;
-  first_name: string;
-  last_name: string;
-  email: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
   phone?: string;
   gender: Gender;
   selected_regions: SelectedRegion[];
   selected_concerns: SelectedConcern[];
+  selected_services: SelectedService[];
   custom_fields: Record<string, unknown>;
+  sms_opt_in?: boolean;
+  email_opt_in?: boolean;
   source_url: string;
 }

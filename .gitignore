@@ -8,6 +8,7 @@ out/
 
 # Build
 dist/
+apps/web/public/widget.js
 
 # Environment
 .env

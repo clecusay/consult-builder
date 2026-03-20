@@ -4,9 +4,9 @@ import { z } from 'zod';
 
 const submissionSchema = z.object({
   tenant_slug: z.string().min(1),
-  first_name: z.string().min(1).max(100),
-  last_name: z.string().min(1).max(100),
-  email: z.string().email(),
+  first_name: z.string().max(100).default(''),
+  last_name: z.string().max(100).default(''),
+  email: z.union([z.string().email(), z.literal('')]).default(''),
   phone: z.string().optional(),
   gender: z.enum(['female', 'male', 'all']),
   selected_regions: z.array(
@@ -24,7 +24,16 @@ const submissionSchema = z.object({
       region_name: z.string(),
     })
   ),
+  selected_services: z.array(
+    z.object({
+      service_id: z.string().uuid(),
+      service_name: z.string(),
+      category_name: z.string(),
+    })
+  ).default([]),
   custom_fields: z.record(z.unknown()).default({}),
+  sms_opt_in: z.boolean().optional(),
+  email_opt_in: z.boolean().optional(),
   source_url: z.string().url().optional(),
 });
 
@@ -62,6 +71,11 @@ export async function POST(request: Request) {
       .eq('tenant_id', tenant.id)
       .single();
 
+    // Merge opt-in values into custom_fields for storage
+    const customFields = { ...data.custom_fields };
+    if (data.sms_opt_in !== undefined) customFields['SMS Opt-In'] = data.sms_opt_in;
+    if (data.email_opt_in !== undefined) customFields['Email Opt-In'] = data.email_opt_in;
+
     // Insert submission
     const { data: submission, error: insertError } = await supabase
       .from('form_submissions')
@@ -74,7 +88,8 @@ export async function POST(request: Request) {
         gender: data.gender,
         selected_regions: data.selected_regions,
         selected_concerns: data.selected_concerns,
-        custom_fields: data.custom_fields,
+        selected_services: data.selected_services,
+        custom_fields: customFields,
         source_url: data.source_url || null,
         lead_status: 'new',
         webhook_status: config?.webhook_url ? 'pending' : null,
@@ -100,7 +115,10 @@ export async function POST(request: Request) {
           gender: data.gender,
           selected_regions: data.selected_regions,
           selected_concerns: data.selected_concerns,
-          custom_fields: data.custom_fields,
+          selected_services: data.selected_services,
+          custom_fields: customFields,
+          sms_opt_in: data.sms_opt_in,
+          email_opt_in: data.email_opt_in,
           source_url: data.source_url,
           submitted_at: submission.created_at,
         },

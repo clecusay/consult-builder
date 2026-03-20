@@ -10,6 +10,7 @@ import type {
   WidgetFormField,
   SelectedRegion,
   SelectedConcern,
+  SelectedService,
   Gender,
   WidgetMode,
 } from '@treatment-builder/shared';
@@ -68,6 +69,13 @@ class TreatmentBuilderWidget extends HTMLElement {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Config error: ${res.status}`);
       this.config = await res.json();
+
+      // Auto-detect: if all regions are face-only, start in face view
+      if (this.config && this.config.regions.length > 0 &&
+          this.config.regions.every(r => r.body_area === 'face')) {
+        this.diagramView = 'face';
+      }
+
       this.render();
     } catch (err) {
       this.shadow.innerHTML = '<div style="color:red;padding:1rem">Failed to load treatment builder. Please try again later.</div>';
@@ -87,6 +95,16 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private get showServices(): boolean {
     return this.widgetMode.includes('services');
+  }
+
+  private get isFaceOnly(): boolean {
+    if (!this.config) return false;
+    return this.config.regions.length > 0 && this.config.regions.every(r => r.body_area === 'face');
+  }
+
+  private get isBodyOnly(): boolean {
+    if (!this.config) return false;
+    return this.config.regions.length > 0 && this.config.regions.every(r => r.body_area === 'body');
   }
 
   private get primaryColor(): string {
@@ -120,6 +138,19 @@ class TreatmentBuilderWidget extends HTMLElement {
       }
     }
     return groups;
+  }
+
+  /** Service categories filtered to only show services relevant to selected regions */
+  private get filteredServiceCategories(): WidgetServiceCategory[] {
+    if (!this.config) return [];
+    const selectedRegionIds = new Set(this.selectedRegions.map(r => r.id));
+    return this.config.service_categories.map(cat => ({
+      ...cat,
+      services: cat.services.filter(svc =>
+        // Show if service has no region mapping (uncategorized) or overlaps selected regions
+        svc.region_ids.length === 0 || svc.region_ids.some(rid => selectedRegionIds.has(rid))
+      ),
+    }));
   }
 
   private get totalSelections(): number {
@@ -278,7 +309,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         <div class="tb-split">
           <div class="tb-diagram-col">
-            ${this.diagramView === 'face'
+            ${this.diagramView === 'face' && !this.isFaceOnly
               ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
               : false}
 
@@ -340,15 +371,18 @@ class TreatmentBuilderWidget extends HTMLElement {
           </div>
         ` : false}
 
-        ${this.showConcerns ? html`
-          ${this.concernsByRegion.map(group => {
+        ${this.showConcerns ? (() => {
+          const hasQuery = !!query;
+          let anyVisible = false;
+          const groups = this.concernsByRegion.map(group => {
             const isExpanded = this.expandedRegions.has(group.regionSlug);
             const count = this.getRegionConcernCount(group.regionSlug);
             const popularIds = this.getPopularIds(group.concerns);
-            const filtered = query
+            const filtered = hasQuery
               ? group.concerns.filter(c => c.name.toLowerCase().includes(query))
               : group.concerns;
-            if (query && filtered.length === 0) return false;
+            if (hasQuery && filtered.length === 0) return false;
+            anyVisible = true;
 
             return html`
               <div>
@@ -365,14 +399,20 @@ class TreatmentBuilderWidget extends HTMLElement {
                 </div>
               </div>
             `;
-          })}
-          ${this.concernsByRegion.length === 0
-            ? html`<p style="padding:16px 0;text-align:center;font-size:11px;color:#94a3b8">No concerns configured for the selected areas.</p>`
-            : false}
-        ` : false}
+          });
+          return html`
+            ${groups}
+            ${this.concernsByRegion.length === 0
+              ? html`<p style="padding:16px 0;text-align:center;font-size:11px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+              : false}
+            ${hasQuery && !anyVisible
+              ? html`<p style="padding:24px 0;text-align:center;font-size:12px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+              : false}
+          `;
+        })() : false}
 
         ${this.showServices && this.config
-          ? this.config.service_categories
+          ? this.filteredServiceCategories
               .filter(cat => cat.services.length > 0)
               .map(cat => html`
                 <div class="tb-svc-cat">
@@ -419,6 +459,11 @@ class TreatmentBuilderWidget extends HTMLElement {
   private renderForm(): SafeHTML {
     const cfg = this.config!;
 
+    // Partition fields: opt-in checkboxes vs regular fields
+    const isOptIn = (f: WidgetFormField) => f.field_key?.endsWith('_opt_in');
+    const contactFields = cfg.form_fields.filter(f => !isOptIn(f));
+    const optInFields = cfg.form_fields.filter(f => isOptIn(f));
+
     return html`
       <div class="tb-root">
         <div class="tb-header">
@@ -429,30 +474,23 @@ class TreatmentBuilderWidget extends HTMLElement {
         ${this.renderStepIndicator()}
 
         <form class="tb-form-body" id="tb-form" novalidate>
-          <div class="tb-form-grid">
-            ${this.renderField('first_name', 'First Name', 'text', 'Jane', true)}
-            ${this.renderField('last_name', 'Last Name', 'text', 'Doe', true)}
-            ${this.renderField('email', 'Email', 'email', 'jane@example.com', true)}
-            ${this.renderField('phone', 'Phone', 'tel', '(555) 555-5555', false)}
-          </div>
-
-          ${cfg.form_fields.length > 0 ? html`
-            <div class="tb-form-grid" style="margin-top:8px">
-              ${cfg.form_fields.map(field => this.renderCustomField(field))}
+          ${contactFields.length > 0 ? html`
+            <div class="tb-form-grid">
+              ${contactFields.map(field => this.renderFormField(field))}
             </div>
           ` : false}
 
-          <div class="tb-optin">
-            <p class="tb-optin-title">Communication Preferences</p>
-            <label class="tb-optin-label">
-              <input type="checkbox" name="sms_opt_in"/>
-              <span>I agree to receive SMS text messages with appointment reminders, promotions, and special offers. Message &amp; data rates may apply. Reply STOP to unsubscribe.</span>
-            </label>
-            <label class="tb-optin-label">
-              <input type="checkbox" name="email_opt_in"/>
-              <span>I would like to receive email updates including exclusive promotions, new treatment announcements, and helpful skincare tips. Unsubscribe anytime.</span>
-            </label>
-          </div>
+          ${optInFields.length > 0 ? html`
+            <div class="tb-optin">
+              <p class="tb-optin-title">Communication Preferences</p>
+              ${optInFields.map(field => html`
+                <label class="tb-optin-label">
+                  <input type="checkbox" name="${field.field_key || 'custom_' + field.id}"/>
+                  <span>${field.placeholder || field.label}</span>
+                </label>
+              `)}
+            </div>
+          ` : false}
 
           ${this.formError ? html`<p class="tb-form-error">${this.formError}</p>` : false}
 
@@ -467,37 +505,39 @@ class TreatmentBuilderWidget extends HTMLElement {
     `;
   }
 
-  private renderField(name: string, label: string, type: string, placeholder: string, required: boolean): SafeHTML {
-    return html`
-      <div class="tb-field">
-        <label class="tb-label">${label}${required ? ' *' : ''}</label>
-        <input class="tb-input" type="${type}" name="${name}" placeholder="${placeholder}" ${required ? raw('required') : false}/>
-      </div>
-    `;
-  }
-
-  private renderCustomField(field: WidgetFormField): SafeHTML {
+  private renderFormField(field: WidgetFormField): SafeHTML {
+    const name = field.field_key || `custom_${field.id}`;
     const req = field.is_required ? raw('required') : false;
+    const isFullWidth = field.field_type === 'textarea' || field.field_type === 'select' || field.field_type === 'radio';
+    const wrapStyle = isFullWidth ? ' style="grid-column:1/-1"' : '';
 
     let fieldEl: SafeHTML;
     if (field.field_type === 'textarea') {
-      fieldEl = html`<textarea class="tb-textarea" name="custom_${field.id}" placeholder="${field.placeholder || ''}" rows="2" ${req}></textarea>`;
+      fieldEl = html`<textarea class="tb-textarea" name="${name}" placeholder="${field.placeholder || ''}" rows="2" ${req}></textarea>`;
     } else if (field.field_type === 'select') {
       fieldEl = html`
-        <select class="tb-select" name="custom_${field.id}" ${req}>
+        <select class="tb-select" name="${name}" ${req}>
           <option value="">Select...</option>
           ${(field.options || []).map(opt => html`<option value="${opt}">${opt}</option>`)}
         </select>
       `;
     } else if (field.field_type === 'checkbox') {
-      fieldEl = html`<div class="tb-checkbox-field"><input type="checkbox" name="custom_${field.id}"/><span>${field.placeholder || field.label}</span></div>`;
+      fieldEl = html`<div class="tb-checkbox-field"><input type="checkbox" name="${name}"/><span>${field.placeholder || field.label}</span></div>`;
+    } else if (field.field_type === 'radio') {
+      fieldEl = html`
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${(field.options || []).map(opt => html`
+            <label class="tb-radio-label"><input type="radio" name="${name}" value="${opt}" ${req}/> ${opt}</label>
+          `)}
+        </div>
+      `;
     } else {
       const inputType = field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text';
-      fieldEl = html`<input class="tb-input" type="${inputType}" name="custom_${field.id}" placeholder="${field.placeholder || ''}" ${req}/>`;
+      fieldEl = html`<input class="tb-input" type="${inputType}" name="${name}" placeholder="${field.placeholder || ''}" ${req}/>`;
     }
 
     return html`
-      <div class="tb-field">
+      <div class="tb-field"${raw(wrapStyle)}>
         <label class="tb-label">${field.label}${field.is_required ? ' *' : ''}</label>
         ${fieldEl}
       </div>
@@ -632,26 +672,54 @@ class TreatmentBuilderWidget extends HTMLElement {
     if (this.submitting || !this.config) return;
 
     const fd = new FormData(form);
-    const firstName = (fd.get('first_name') as string || '').trim();
-    const lastName = (fd.get('last_name') as string || '').trim();
-    const email = (fd.get('email') as string || '').trim();
-    const phone = (fd.get('phone') as string || '').trim();
+    const fields = this.config.form_fields;
 
-    if (!firstName || !lastName || !email) {
-      this.formError = 'Please fill in all required fields.';
-      this.render();
-      return;
+    // System field_keys that map to top-level payload properties
+    const SYSTEM_KEYS = new Set(['first_name', 'last_name', 'email', 'phone']);
+    const OPT_IN_KEYS = new Set(['sms_opt_in', 'email_opt_in']);
+
+    // Validate required fields
+    for (const field of fields) {
+      if (!field.is_required) continue;
+      const name = field.field_key || `custom_${field.id}`;
+      if (field.field_type === 'checkbox') continue;
+      const val = (fd.get(name) as string || '').trim();
+      if (!val) {
+        this.formError = `Please fill in "${field.label}".`;
+        this.render();
+        return;
+      }
     }
 
-    // Collect custom fields
+    // Validate email format
+    for (const field of fields) {
+      if (field.field_type !== 'email') continue;
+      const name = field.field_key || `custom_${field.id}`;
+      const val = (fd.get(name) as string || '').trim();
+      if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        this.formError = 'Please enter a valid email address.';
+        this.render();
+        return;
+      }
+    }
+
+    // Build payload from dynamic fields
+    const systemValues: Record<string, string> = {};
+    const optInValues: Record<string, boolean> = {};
     const customFields: Record<string, unknown> = {};
-    if (this.config.form_fields) {
-      for (const field of this.config.form_fields) {
-        const key = `custom_${field.id}`;
+
+    for (const field of fields) {
+      const name = field.field_key || `custom_${field.id}`;
+
+      if (field.field_key && OPT_IN_KEYS.has(field.field_key)) {
+        optInValues[field.field_key] = fd.has(name);
+      } else if (field.field_key && SYSTEM_KEYS.has(field.field_key)) {
+        systemValues[field.field_key] = (fd.get(name) as string || '').trim();
+      } else {
         if (field.field_type === 'checkbox') {
-          customFields[field.label] = fd.has(key);
+          customFields[field.label] = fd.has(name);
         } else {
-          const val = (fd.get(key) as string || '').trim();
+          const val = (fd.get(name) as string || '').trim();
           if (val) customFields[field.label] = val;
         }
       }
@@ -677,18 +745,34 @@ class TreatmentBuilderWidget extends HTMLElement {
       }
     }
 
-    const payload = {
+    // Build selected services
+    const selectedServices: SelectedService[] = [];
+    if (this.config) {
+      for (const cat of this.config.service_categories) {
+        for (const svc of cat.services) {
+          if (this.selectedServiceIds.has(svc.id)) {
+            selectedServices.push({ service_id: svc.id, service_name: svc.name, category_name: cat.name });
+          }
+        }
+      }
+    }
+
+    const payload: Record<string, unknown> = {
       tenant_slug: this.tenantSlug,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone: phone || undefined,
+      first_name: systemValues.first_name || '',
+      last_name: systemValues.last_name || '',
+      email: systemValues.email || '',
+      phone: systemValues.phone || undefined,
       gender: this.selectedGender as Gender,
       selected_regions: selectedRegions,
       selected_concerns: selectedConcerns,
+      selected_services: selectedServices,
       custom_fields: customFields,
       source_url: window.location.href,
     };
+
+    if (optInValues.sms_opt_in !== undefined) payload.sms_opt_in = optInValues.sms_opt_in;
+    if (optInValues.email_opt_in !== undefined) payload.email_opt_in = optInValues.email_opt_in;
 
     this.submitting = true;
     this.formError = '';

@@ -25,7 +25,11 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): SafeH
     if (v instanceof SafeHTML) {
       out += v.value;
     } else if (Array.isArray(v)) {
-      for (const item of v) out += item instanceof SafeHTML ? item.value : esc(String(item ?? ''));
+      for (const item of v) {
+        if (item instanceof SafeHTML) out += item.value;
+        else if (item == null || item === false) { /* skip */ }
+        else out += esc(String(item));
+      }
     } else if (v == null || v === false) {
       // skip — enables ${condition && html`...`}
     } else {

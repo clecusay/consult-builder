@@ -186,6 +186,26 @@ const TREATMENT_LIBRARY: Treatment[] = [
 
 const LIBRARY_CATEGORIES = [...new Set(TREATMENT_LIBRARY.map((t) => t.category))];
 
+// Maps each treatment category to relevant body regions.
+// Values can be body_area names ('face', 'body') which match ALL regions in
+// that area, or specific region slugs (e.g. 'chest') for granular control.
+// Used to auto-populate service_body_regions so the widget only shows
+// body regions relevant to the tenant's enabled services.
+const CATEGORY_BODY_AREAS: Record<string, string[]> = {
+  'Surgical — Face': ['face'],
+  'Surgical — Breast': ['chest'],
+  'Surgical — Body': ['body'],
+  'Surgical — Hair': ['face'],
+  'Injectables & Fillers': ['face'],
+  'Skin Treatments & Facials': ['face', 'body'],
+  'Laser & Energy': ['face', 'body'],
+  'Body Contouring (Non-Surgical)': ['body'],
+  'Vein & Vascular': ['lower-legs', 'thighs'],
+  'Wellness & Regenerative': ['face', 'body'],
+  'Sexual Wellness': ['intimate'],
+  'Dental & Smile': ['lower-face', 'lips'],
+};
+
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -207,6 +227,7 @@ export default function ServicesPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [tenantSlug, setTenantSlug] = useState<string | null>(null);
 
   // Search & filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -224,12 +245,14 @@ export default function ServicesPage() {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('tenant_id')
+        .select('tenant_id, tenants (slug)')
         .eq('user_id', user.id)
         .single();
 
       if (!profile) return;
       setTenantId(profile.tenant_id);
+      const tenant = (profile as Record<string, unknown>).tenants as { slug: string } | null;
+      if (tenant) setTenantSlug(tenant.slug);
 
       // Load tenant's existing services — match by name to our standard list
       const { data: existingServices } = await supabase
@@ -311,23 +334,111 @@ export default function ServicesPage() {
     setSaving(true);
     setSaved(false);
 
-    // Delete existing services and insert the enabled ones
+    // Delete existing services (cascades to service_body_regions)
     await supabase.from('services').delete().eq('tenant_id', tenantId);
+    // Delete existing tenant-specific service categories
+    await supabase.from('service_categories').delete().eq('tenant_id', tenantId);
 
-    const rows = TREATMENT_LIBRARY
-      .filter((t) => enabled.has(t.name.toLowerCase()))
-      .map((t, i) => ({
-        tenant_id: tenantId,
-        name: t.name,
-        slug: generateSlug(t.name),
-        description: t.description,
-        category_id: null,
-        is_active: true,
-        display_order: i + 1,
-      }));
+    const enabledTreatments = TREATMENT_LIBRARY.filter((t) =>
+      enabled.has(t.name.toLowerCase()),
+    );
 
-    if (rows.length > 0) {
-      await supabase.from('services').insert(rows);
+    if (enabledTreatments.length === 0) {
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      return;
+    }
+
+    // Create service_categories for the unique categories in use
+    const uniqueCategories = [...new Set(enabledTreatments.map((t) => t.category))];
+    const catRows = uniqueCategories.map((cat, i) => ({
+      tenant_id: tenantId,
+      name: cat,
+      slug: generateSlug(cat),
+      display_order: i,
+      is_active: true,
+    }));
+
+    const { data: insertedCats } = await supabase
+      .from('service_categories')
+      .insert(catRows)
+      .select('id, name');
+
+    const categoryLookup = new Map<string, string>();
+    for (const cat of insertedCats || []) {
+      categoryLookup.set(cat.name, cat.id);
+    }
+
+    // Insert services with proper category_id
+    const serviceRows = enabledTreatments.map((t, i) => ({
+      tenant_id: tenantId,
+      name: t.name,
+      slug: generateSlug(t.name),
+      description: t.description,
+      category_id: categoryLookup.get(t.category) || null,
+      is_active: true,
+      display_order: i + 1,
+    }));
+
+    const { data: insertedServices } = await supabase
+      .from('services')
+      .insert(serviceRows)
+      .select('id, name, category_id');
+
+    // Populate service_body_regions so the widget filters regions correctly
+    if (insertedServices && insertedServices.length > 0) {
+      // Fetch all body regions (platform defaults + tenant-specific)
+      const { data: bodyRegions } = await supabase
+        .from('body_regions')
+        .select('id, slug, body_area')
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        .eq('is_active', true);
+
+      if (bodyRegions && bodyRegions.length > 0) {
+        // Build category_id → target keys mapping
+        const catIdToTargets = new Map<string, string[]>();
+        for (const [catName, targets] of Object.entries(CATEGORY_BODY_AREAS)) {
+          const catId = categoryLookup.get(catName);
+          if (catId) catIdToTargets.set(catId, targets);
+        }
+
+        // Group region IDs by body_area AND by slug for granular lookups
+        const regionsByArea = new Map<string, string[]>();
+        const regionsBySlug = new Map<string, string[]>();
+        for (const r of bodyRegions) {
+          const areaList = regionsByArea.get(r.body_area) || [];
+          areaList.push(r.id);
+          regionsByArea.set(r.body_area, areaList);
+
+          const slugList = regionsBySlug.get(r.slug) || [];
+          slugList.push(r.id);
+          regionsBySlug.set(r.slug, slugList);
+        }
+
+        const BODY_AREA_VALUES = new Set(['face', 'body']);
+
+        // Build service → region links
+        const links: { service_id: string; body_region_id: string }[] = [];
+        for (const svc of insertedServices) {
+          if (!svc.category_id) continue;
+          const targets = catIdToTargets.get(svc.category_id) || [];
+          for (const target of targets) {
+            // If the target is a body_area ('face'/'body'), match all regions in that area.
+            // Otherwise treat it as a specific region slug.
+            const regionIds = BODY_AREA_VALUES.has(target)
+              ? regionsByArea.get(target) || []
+              : regionsBySlug.get(target) || [];
+            for (const regionId of regionIds) {
+              links.push({ service_id: svc.id, body_region_id: regionId });
+            }
+          }
+        }
+
+        if (links.length > 0) {
+          await supabase.from('service_body_regions').insert(links);
+        }
+      }
     }
 
     setSaving(false);

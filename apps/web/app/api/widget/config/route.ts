@@ -5,6 +5,7 @@ import type { WidgetConfigResponse, WidgetRegion, WidgetConcern } from '@treatme
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
+  const locationId = searchParams.get('location');
 
   if (!slug) {
     return NextResponse.json({ error: 'Missing slug parameter' }, { status: 400 });
@@ -35,13 +36,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Widget not configured' }, { status: 404 });
   }
 
+  const widgetMode: string = config.widget_mode || 'regions_concerns';
+  const modeIncludesServices = widgetMode.includes('services');
+  const modeIncludesConcerns = widgetMode.includes('concerns');
+
   // Fetch body regions: tenant-specific first, then platform defaults
-  // Tenant overrides have the same slug, so we prefer tenant-specific rows
-  const { data: tenantRegions } = await supabase
+  // Tenant overrides have the same slug, so we prefer tenant-specific rows.
+  // We must fetch ALL tenant overrides (including inactive) so disabled
+  // overrides properly shadow the platform defaults.
+  const { data: allTenantRegions } = await supabase
     .from('body_regions')
     .select('*')
     .eq('tenant_id', tenant.id)
-    .eq('is_active', true)
     .order('display_order');
 
   const { data: defaultRegions } = await supabase
@@ -51,19 +57,35 @@ export async function GET(request: Request) {
     .eq('is_active', true)
     .order('display_order');
 
-  // Merge: tenant overrides replace defaults with the same slug+gender
+  // Merge: tenant overrides replace defaults with the same slug+gender.
+  // Use ALL tenant slugs (active + inactive) for shadowing, then only
+  // include active regions in the final result.
   const tenantSlugs = new Set(
-    (tenantRegions || []).map((r: { slug: string; gender: string }) => `${r.slug}:${r.gender}`)
+    (allTenantRegions || []).map((r: { slug: string; gender: string }) => `${r.slug}:${r.gender}`)
+  );
+  const activeTenantRegions = (allTenantRegions || []).filter(
+    (r: { is_active: boolean }) => r.is_active
   );
   const mergedRegions = [
-    ...(tenantRegions || []),
+    ...activeTenantRegions,
     ...(defaultRegions || []).filter(
       (r: { slug: string; gender: string }) => !tenantSlugs.has(`${r.slug}:${r.gender}`)
     ),
   ].sort((a: { display_order: number }, b: { display_order: number }) => a.display_order - b.display_order);
 
-  // Fetch concerns for all relevant region IDs
-  const regionIds = mergedRegions.map((r: { id: string }) => r.id);
+  // Build a mapping from slug+gender → platform default ID so that tenant
+  // clones can inherit the default's relationships (concerns, service links).
+  const defaultIdBySlugGender = new Map<string, string>();
+  for (const r of defaultRegions || []) {
+    defaultIdBySlugGender.set(`${(r as { slug: string }).slug}:${(r as { gender: string }).gender}`, (r as { id: string }).id);
+  }
+  const getEffectiveId = (r: { id: string; slug: string; gender: string; tenant_id: string | null }) =>
+    r.tenant_id ? (defaultIdBySlugGender.get(`${r.slug}:${r.gender}`) ?? r.id) : r.id;
+
+  // Fetch concerns using effective IDs (platform default IDs) so tenant
+  // clones inherit the platform default's concerns.
+  const effectiveIds = mergedRegions.map((r: { id: string; slug: string; gender: string; tenant_id: string | null }) => getEffectiveId(r));
+  const regionIds = [...new Set([...mergedRegions.map((r: { id: string }) => r.id), ...effectiveIds])];
   const { data: allConcerns } = await supabase
     .from('concerns')
     .select('*')
@@ -85,44 +107,61 @@ export async function GET(request: Request) {
     concernsByRegion.set(c.body_region_id, list);
   }
 
-  // Build regions response
-  const regions: WidgetRegion[] = mergedRegions.map((r: Record<string, unknown>) => ({
-    id: r.id as string,
-    name: r.name as string,
-    slug: r.slug as string,
-    gender: r.gender as 'female' | 'male' | 'all',
-    body_area: r.body_area as 'face' | 'body',
-    display_order: r.display_order as number,
-    hotspot_x: r.hotspot_x as number | null,
-    hotspot_y: r.hotspot_y as number | null,
-    diagram_view: r.diagram_view as 'front' | 'back' | 'face' | null,
-    concerns: concernsByRegion.get(r.id as string) || [],
-  }));
-
   // Fetch form fields
   const { data: formFields } = await supabase
     .from('form_fields')
-    .select('id, field_type, label, placeholder, options, is_required, display_order')
+    .select('id, field_key, field_type, label, placeholder, options, is_required, display_order')
     .eq('tenant_id', tenant.id)
     .order('display_order');
 
+  // Fallback defaults if tenant has no form fields configured yet
+  const DEFAULT_FORM_FIELDS = [
+    { id: 'default-first-name', field_key: 'first_name', field_type: 'text', label: 'First Name', placeholder: 'Jane', options: null, is_required: true, display_order: 0 },
+    { id: 'default-last-name', field_key: 'last_name', field_type: 'text', label: 'Last Name', placeholder: 'Doe', options: null, is_required: true, display_order: 1 },
+    { id: 'default-email', field_key: 'email', field_type: 'email', label: 'Email', placeholder: 'jane@example.com', options: null, is_required: true, display_order: 2 },
+    { id: 'default-phone', field_key: 'phone', field_type: 'phone', label: 'Phone', placeholder: '(555) 555-5555', options: null, is_required: false, display_order: 3 },
+    { id: 'default-sms-opt-in', field_key: 'sms_opt_in', field_type: 'checkbox', label: 'SMS Opt-In', placeholder: 'I agree to receive SMS text messages with appointment reminders, promotions, and special offers. Message & data rates may apply. Reply STOP to unsubscribe.', options: null, is_required: false, display_order: 100 },
+    { id: 'default-email-opt-in', field_key: 'email_opt_in', field_type: 'checkbox', label: 'Email Opt-In', placeholder: 'I would like to receive email updates including exclusive promotions, new treatment announcements, and helpful skincare tips. Unsubscribe anytime.', options: null, is_required: false, display_order: 101 },
+  ];
+
   // Fetch services + categories for widget
+  let allTenantServices: { id: string; name: string; slug: string; description: string | null; category_id: string | null }[] = [];
   const { data: tenantServices } = await supabase
     .from('services')
     .select('id, name, slug, description, category_id, is_active')
     .eq('tenant_id', tenant.id)
     .eq('is_active', true)
     .order('display_order');
+  allTenantServices = tenantServices || [];
 
-  const { data: serviceRegionLinks } = await supabase
-    .from('service_body_regions')
-    .select('service_id, body_region_id')
-    .in('service_id', (tenantServices || []).map((s: { id: string }) => s.id));
+  // If a location is specified, filter services to only those offered at that location
+  if (locationId && allTenantServices.length > 0) {
+    const { data: locationServiceLinks } = await supabase
+      .from('location_services')
+      .select('service_id')
+      .eq('location_id', locationId);
 
-  const { data: concernServiceLinks } = await supabase
-    .from('concern_services')
-    .select('concern_id, service_id')
-    .in('service_id', (tenantServices || []).map((s: { id: string }) => s.id));
+    if (locationServiceLinks && locationServiceLinks.length > 0) {
+      const locationServiceIds = new Set(locationServiceLinks.map((l: { service_id: string }) => l.service_id));
+      allTenantServices = allTenantServices.filter(s => locationServiceIds.has(s.id));
+    }
+  }
+
+  const serviceIds = allTenantServices.map(s => s.id);
+
+  const { data: serviceRegionLinks } = serviceIds.length > 0
+    ? await supabase
+        .from('service_body_regions')
+        .select('service_id, body_region_id')
+        .in('service_id', serviceIds)
+    : { data: [] };
+
+  const { data: concernServiceLinks } = serviceIds.length > 0
+    ? await supabase
+        .from('concern_services')
+        .select('concern_id, service_id')
+        .in('service_id', serviceIds)
+    : { data: [] };
 
   // Build region/concern maps for services
   const serviceRegionMap = new Map<string, string[]>();
@@ -139,8 +178,71 @@ export async function GET(request: Request) {
     serviceConcernMap.set(link.service_id, list);
   }
 
+  // ── Filter regions to only those relevant to the tenant's offerings ──
+  // Collect region IDs that have services linked to them
+  const regionIdsWithServices = new Set<string>();
+  for (const links of serviceRegionMap.values()) {
+    for (const regionId of links) {
+      regionIdsWithServices.add(regionId);
+    }
+  }
+
+  // Collect region IDs that have concerns configured
+  const regionIdsWithConcerns = new Set<string>(concernsByRegion.keys());
+
+  // The tenant has explicitly configured service → body-region mappings.
+  // This is the strongest signal of what they offer, so use it as the
+  // primary scope for which body parts appear on the diagram.
+  const hasServiceRegionLinks = regionIdsWithServices.size > 0;
+
+  // Determine which regions to keep:
+  // Priority 1: If the tenant has service-body-region links, use them as the
+  //   authoritative list of offered regions. This prevents a face-only clinic
+  //   from showing abdomen, legs, etc. even though platform-default concerns
+  //   exist for those body parts.
+  // Priority 2: If no service-region links exist but tenant has services, show
+  //   all regions (services haven't been mapped to regions yet).
+  // Priority 3: If no services at all (fresh tenant), show all regions as a
+  //   fallback so the widget isn't empty.
+  // Helper: check if a region (or its platform default equivalent) has services
+  const hasServices = (r: { id: string; slug: string; gender: string; tenant_id: string | null }) =>
+    regionIdsWithServices.has(r.id) || regionIdsWithServices.has(getEffectiveId(r));
+  const hasConcerns = (r: { id: string; slug: string; gender: string; tenant_id: string | null }) =>
+    regionIdsWithConcerns.has(r.id) || regionIdsWithConcerns.has(getEffectiveId(r));
+
+  const filteredRegions = hasServiceRegionLinks
+    ? mergedRegions.filter((r: { id: string; slug: string; gender: string; tenant_id: string | null }) => {
+        if (modeIncludesServices && modeIncludesConcerns) {
+          return hasServices(r);
+        }
+        if (modeIncludesServices) {
+          return hasServices(r);
+        }
+        if (modeIncludesConcerns) {
+          return hasServices(r) && hasConcerns(r);
+        }
+        return true;
+      })
+    : mergedRegions; // no service-region links: show everything
+
+  // Build regions response
+  const regions: WidgetRegion[] = filteredRegions.map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    name: r.name as string,
+    slug: r.slug as string,
+    gender: r.gender as 'female' | 'male' | 'all',
+    body_area: r.body_area as 'face' | 'body',
+    display_order: r.display_order as number,
+    hotspot_x: r.hotspot_x as number | null,
+    hotspot_y: r.hotspot_y as number | null,
+    diagram_view: r.diagram_view as 'front' | 'back' | 'face' | null,
+    concerns: concernsByRegion.get(r.id as string)
+      || concernsByRegion.get(getEffectiveId(r as { id: string; slug: string; gender: string; tenant_id: string | null }))
+      || [],
+  }));
+
   // Fetch service categories
-  const categoryIds = [...new Set((tenantServices || []).map((s: { category_id: string | null }) => s.category_id).filter(Boolean))];
+  const categoryIds = [...new Set(allTenantServices.map(s => s.category_id).filter(Boolean))];
   const { data: categories } = categoryIds.length > 0
     ? await supabase
         .from('service_categories')
@@ -152,9 +254,9 @@ export async function GET(request: Request) {
     id: cat.id,
     name: cat.name,
     slug: cat.slug,
-    services: (tenantServices || [])
-      .filter((s: { category_id: string | null }) => s.category_id === cat.id)
-      .map((s: { id: string; name: string; slug: string; description: string | null; category_id: string | null }) => ({
+    services: allTenantServices
+      .filter(s => s.category_id === cat.id)
+      .map(s => ({
         id: s.id,
         name: s.name,
         slug: s.slug,
@@ -166,9 +268,9 @@ export async function GET(request: Request) {
   }));
 
   // Add uncategorized services
-  const uncategorized = (tenantServices || [])
-    .filter((s: { category_id: string | null }) => !s.category_id)
-    .map((s: { id: string; name: string; slug: string; description: string | null; category_id: string | null }) => ({
+  const uncategorized = allTenantServices
+    .filter(s => !s.category_id)
+    .map(s => ({
       id: s.id,
       name: s.name,
       slug: s.slug,
@@ -207,7 +309,7 @@ export async function GET(request: Request) {
     diagram_type: config.diagram_type || 'full_body',
     regions,
     service_categories: serviceCategories,
-    form_fields: formFields || [],
+    form_fields: (formFields && formFields.length > 0) ? formFields : DEFAULT_FORM_FIELDS,
   };
 
   // Cache for 60 seconds

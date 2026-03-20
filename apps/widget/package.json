@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && pnpm copy-to-web",
+    "copy-to-web": "mkdir -p ../web/public && cp dist/widget.js ../web/public/widget.js",
     "preview": "vite preview"
   },
   "dependencies": {

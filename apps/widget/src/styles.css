@@ -732,6 +732,18 @@
   accent-color: var(--tb-primary, #e84393);
 }
 
+.tb-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+}
+.tb-radio-label input[type="radio"] {
+  accent-color: var(--tb-primary, #e84393);
+}
+
 /* --- Opt-in --- */
 
 .tb-optin {

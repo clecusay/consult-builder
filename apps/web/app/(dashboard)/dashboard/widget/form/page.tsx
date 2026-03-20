@@ -47,6 +47,12 @@ interface PresetField {
   hasOptions?: boolean;
 }
 
+interface ActiveService {
+  id: string;
+  name: string;
+  category_name: string;
+}
+
 const presetFields: PresetField[] = [
   {
     key: 'phone',
@@ -92,6 +98,8 @@ export default function FormFieldsPage() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [procedureOptions, setProcedureOptions] = useState<string[]>([]);
   const [newProcedure, setNewProcedure] = useState('');
+  const [activeServices, setActiveServices] = useState<ActiveService[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -122,11 +130,27 @@ export default function FormFieldsPage() {
       if (!profile) return;
       setTenantId(profile.tenant_id);
 
+      // Fetch existing form fields
       const { data: existingFields } = await supabase
         .from('form_fields')
         .select('id, label, field_type, is_required, display_order, options')
         .eq('tenant_id', profile.tenant_id)
         .order('display_order', { ascending: true });
+
+      // Fetch active services for this tenant
+      const { data: services } = await supabase
+        .from('services')
+        .select('id, name, category_id, service_categories(name)')
+        .eq('tenant_id', profile.tenant_id)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      const svcList: ActiveService[] = (services ?? []).map((s: Record<string, unknown>) => ({
+        id: s.id as string,
+        name: s.name as string,
+        category_name: (s.service_categories as Record<string, unknown> | null)?.name as string ?? 'Uncategorized',
+      }));
+      setActiveServices(svcList);
 
       const allFields = (existingFields ?? []) as CustomField[];
 
@@ -137,6 +161,7 @@ export default function FormFieldsPage() {
         procedure: false,
       };
       const customOnly: CustomField[] = [];
+      const savedServiceNames = new Set<string>();
 
       for (const f of allFields) {
         if (f.label === 'Phone Number' && f.field_type === 'phone') {
@@ -145,12 +170,20 @@ export default function FormFieldsPage() {
           presetState.date_of_birth = true;
         } else if (f.label === 'Procedure' && f.field_type === 'select') {
           presetState.procedure = true;
-          setProcedureOptions(f.options ?? []);
+          // Load previously saved options
+          const opts = f.options ?? [];
+          setProcedureOptions(opts);
+          // Match saved options to active service IDs
+          for (const svc of svcList) {
+            if (opts.includes(svc.name)) savedServiceNames.add(svc.id);
+          }
+          // Also keep any custom procedure names that aren't in active services
         } else {
           customOnly.push(f);
         }
       }
 
+      setSelectedServiceIds(savedServiceNames);
       setEnabledPresets(presetState);
       setFields(customOnly);
       setLoading(false);
@@ -158,6 +191,20 @@ export default function FormFieldsPage() {
 
     load();
   }, [supabase]);
+
+  function toggleServiceOption(svc: ActiveService) {
+    const next = new Set(selectedServiceIds);
+    if (next.has(svc.id)) {
+      next.delete(svc.id);
+      setProcedureOptions(procedureOptions.filter((o) => o !== svc.name));
+    } else {
+      next.add(svc.id);
+      if (!procedureOptions.includes(svc.name)) {
+        setProcedureOptions([...procedureOptions, svc.name]);
+      }
+    }
+    setSelectedServiceIds(next);
+  }
 
   function addProcedureOption() {
     const trimmed = newProcedure.trim();
@@ -168,6 +215,13 @@ export default function FormFieldsPage() {
 
   function removeProcedureOption(opt: string) {
     setProcedureOptions(procedureOptions.filter((o) => o !== opt));
+    // Also deselect if it matches an active service
+    const svc = activeServices.find((s) => s.name === opt);
+    if (svc) {
+      const next = new Set(selectedServiceIds);
+      next.delete(svc.id);
+      setSelectedServiceIds(next);
+    }
   }
 
   function addCustomField() {
@@ -341,7 +395,7 @@ export default function FormFieldsPage() {
         </CardContent>
       </Card>
 
-      {/* Preset Custom Fields */}
+      {/* Preset Fields */}
       <Card>
         <CardHeader>
           <CardTitle>Preset Fields</CardTitle>
@@ -350,7 +404,7 @@ export default function FormFieldsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {presetFields.map((preset) => {
+          {presetFields.map((preset, index) => {
             const enabled = enabledPresets[preset.key];
             const Icon = preset.icon;
             return (
@@ -381,64 +435,127 @@ export default function FormFieldsPage() {
                   />
                 </div>
 
-                {/* Procedure options when enabled */}
+                {/* Procedure options — connected to active services */}
                 {preset.key === 'procedure' && enabled && (
-                  <div className="ml-12 mt-3 space-y-3">
-                    <Label className="text-xs">Procedure Options</Label>
-                    {procedureOptions.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {procedureOptions.map((opt) => (
-                          <Badge
-                            key={opt}
-                            variant="secondary"
-                            className="gap-1 pr-1"
-                          >
-                            {opt}
-                            <button
-                              type="button"
-                              onClick={() => removeProcedureOption(opt)}
-                              className="ml-1 rounded-full p-0.5 hover:bg-slate-200"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
+                  <div className="ml-12 mt-3 space-y-4">
+                    {/* Active services from the Services page */}
+                    {activeServices.length > 0 ? (
+                      <div className="space-y-3">
+                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Your Active Services
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Select which of your active services appear in the procedure dropdown
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                          {activeServices.map((svc) => {
+                            const isSelected = selectedServiceIds.has(svc.id);
+                            return (
+                              <button
+                                key={svc.id}
+                                type="button"
+                                onClick={() => toggleServiceOption(svc)}
+                                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                                  isSelected
+                                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <div
+                                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                    isSelected
+                                      ? 'border-indigo-500 bg-indigo-500'
+                                      : 'border-slate-300'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="h-3 w-3 text-white" />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="block truncate font-medium">{svc.name}</span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {svc.category_name}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedServiceIds.size} of {activeServices.length} services selected
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-amber-300 bg-amber-50 p-3">
+                        <p className="text-xs text-amber-700">
+                          No active services found. Enable services on the{' '}
+                          <a href="/dashboard/widget/services" className="underline font-medium">
+                            Services &amp; Procedures
+                          </a>{' '}
+                          page first.
+                        </p>
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <Input
-                        value={newProcedure}
-                        onChange={(e) => setNewProcedure(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addProcedureOption();
-                          }
-                        }}
-                        placeholder="e.g. Botox, Liposuction, Facelift..."
-                        className="flex-1 text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addProcedureOption}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add
-                      </Button>
+
+                    <Separator />
+
+                    {/* Custom procedure options */}
+                    <div className="space-y-3">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Custom Procedures
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Add custom options that aren&apos;t in your services list
+                      </p>
+                      {procedureOptions.filter((opt) => !activeServices.some((s) => s.name === opt)).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {procedureOptions
+                            .filter((opt) => !activeServices.some((s) => s.name === opt))
+                            .map((opt) => (
+                              <Badge
+                                key={opt}
+                                variant="secondary"
+                                className="gap-1 pr-1"
+                              >
+                                {opt}
+                                <button
+                                  type="button"
+                                  onClick={() => removeProcedureOption(opt)}
+                                  className="ml-1 rounded-full p-0.5 hover:bg-slate-200"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newProcedure}
+                          onChange={(e) => setNewProcedure(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addProcedureOption();
+                            }
+                          }}
+                          placeholder="e.g. Custom Treatment Name..."
+                          className="flex-1 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addProcedureOption}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      These options appear in the procedure dropdown on your
-                      widget form. Press Enter to add.
-                    </p>
                   </div>
                 )}
 
-                {preset.key !== 'procedure' && <Separator className="mt-4" />}
-                {preset.key === 'procedure' && !enabled && (
-                  <Separator className="mt-4" />
-                )}
+                {index < presetFields.length - 1 && <Separator className="mt-4" />}
               </div>
             );
           })}

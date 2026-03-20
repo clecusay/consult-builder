@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -9,12 +8,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, MapPin } from 'lucide-react';
+import { Sparkles, MapPin, Save, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { saveRegionChanges } from './actions';
 
 export interface ConcernItem {
   id: string;
@@ -81,61 +82,45 @@ function mergeGroups(groups: ConcernGroup[]): MergedRegion[] {
 
 export function ConcernsPanel({ groups, totalConcerns, activeConcerns }: Props) {
   const [concernGroups, setConcernGroups] = useState(groups);
-  const [activeCount, setActiveCount] = useState(activeConcerns);
-  const supabase = createClient();
+  // Snapshot of the last-saved state to detect dirty changes
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(groups));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const merged = useMemo(() => mergeGroups(concernGroups), [concernGroups]);
   const [selectedKey, setSelectedKey] = useState<string | null>(merged[0]?.key ?? null);
   const selectedRegion = merged.find((m) => m.key === selectedKey) ?? null;
 
-  async function toggleRegion(region: MergedRegion, checked: boolean) {
+  const activeCount = useMemo(
+    () => concernGroups.reduce((sum, g) => sum + g.concerns.filter((c) => c.is_active).length, 0),
+    [concernGroups]
+  );
+
+  const isDirty = useMemo(
+    () => JSON.stringify(concernGroups) !== savedSnapshot,
+    [concernGroups, savedSnapshot]
+  );
+
+  // ── Local-only toggles (no server calls) ───────────────────────────
+
+  function toggleRegion(region: MergedRegion, checked: boolean) {
     const ids = region.variants.map((v) => v.regionId);
-    // Optimistic
     setConcernGroups((prev) =>
       prev.map((g) =>
         ids.includes(g.regionId) ? { ...g, regionIsActive: checked } : g
       )
     );
-
-    const { error } = await supabase
-      .from('body_regions')
-      .update({ is_active: checked })
-      .in('id', ids);
-
-    if (error) {
-      setConcernGroups((prev) =>
-        prev.map((g) =>
-          ids.includes(g.regionId) ? { ...g, regionIsActive: !checked } : g
-        )
-      );
-      toast.error('Failed to update region');
-    }
   }
 
-  async function toggleGenderVariant(regionId: string, checked: boolean) {
-    // Optimistic
+  function toggleGenderVariant(regionId: string, checked: boolean) {
     setConcernGroups((prev) =>
       prev.map((g) =>
         g.regionId === regionId ? { ...g, regionIsActive: checked } : g
       )
     );
-
-    const { error } = await supabase
-      .from('body_regions')
-      .update({ is_active: checked })
-      .eq('id', regionId);
-
-    if (error) {
-      setConcernGroups((prev) =>
-        prev.map((g) =>
-          g.regionId === regionId ? { ...g, regionIsActive: !checked } : g
-        )
-      );
-      toast.error('Failed to update gender');
-    }
   }
 
-  async function toggleConcern(ids: string[], checked: boolean) {
+  function toggleConcern(ids: string[], checked: boolean) {
     setConcernGroups((prev) =>
       prev.map((group) => ({
         ...group,
@@ -144,26 +129,64 @@ export function ConcernsPanel({ groups, totalConcerns, activeConcerns }: Props) 
         ),
       }))
     );
-    setActiveCount((prev) => prev + (checked ? ids.length : -ids.length));
-
-    const { error } = await supabase
-      .from('concerns')
-      .update({ is_active: checked })
-      .in('id', ids);
-
-    if (error) {
-      setConcernGroups((prev) =>
-        prev.map((group) => ({
-          ...group,
-          concerns: group.concerns.map((c) =>
-            ids.includes(c.id) ? { ...c, is_active: !checked } : c
-          ),
-        }))
-      );
-      setActiveCount((prev) => prev + (checked ? -ids.length : ids.length));
-      toast.error('Failed to update concern');
-    }
   }
+
+  // ── Batch save ─────────────────────────────────────────────────────
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setSaved(false);
+
+    try {
+      const initial: ConcernGroup[] = JSON.parse(savedSnapshot);
+
+      // Compute region changes (isActive toggled)
+      const regionChanges: { regionId: string; isActive: boolean }[] = [];
+      for (const group of concernGroups) {
+        const orig = initial.find((g) => g.regionId === group.regionId);
+        if (orig && orig.regionIsActive !== group.regionIsActive) {
+          regionChanges.push({ regionId: group.regionId, isActive: group.regionIsActive });
+        }
+      }
+
+      // Compute concern changes
+      const toEnable: string[] = [];
+      const toDisable: string[] = [];
+      for (const group of concernGroups) {
+        const origGroup = initial.find((g) => g.regionId === group.regionId);
+        if (!origGroup) continue;
+        for (const concern of group.concerns) {
+          const origConcern = origGroup.concerns.find((c) => c.id === concern.id);
+          if (origConcern && origConcern.is_active !== concern.is_active) {
+            if (concern.is_active) toEnable.push(concern.id);
+            else toDisable.push(concern.id);
+          }
+        }
+      }
+
+      const concernChanges: { ids: string[]; isActive: boolean }[] = [];
+      if (toEnable.length > 0) concernChanges.push({ ids: toEnable, isActive: true });
+      if (toDisable.length > 0) concernChanges.push({ ids: toDisable, isActive: false });
+
+      const result = await saveRegionChanges(regionChanges, concernChanges);
+      const error = result?.error;
+
+      if (error) {
+        toast.error(`Failed to save: ${typeof error === 'string' ? error : JSON.stringify(error)}`);
+        setSaving(false);
+        return;
+      }
+
+      // Update the snapshot so isDirty resets
+      setSavedSnapshot(JSON.stringify(concernGroups));
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      toast.error(`Save error: ${err instanceof Error ? err.message : String(err)}`);
+      setSaving(false);
+    }
+  }, [concernGroups, savedSnapshot]);
 
   if (merged.length === 0) {
     return (
@@ -186,32 +209,53 @@ export function ConcernsPanel({ groups, totalConcerns, activeConcerns }: Props) 
 
   return (
     <div className="space-y-6">
+      {/* Header with Save Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Body Regions &amp; Concerns</h2>
+          <p className="text-sm text-muted-foreground">
+            Toggle regions and concerns for your widget
+          </p>
+        </div>
+        <Button onClick={handleSave} disabled={saving || !isDirty}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : saved ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
+        </Button>
+      </div>
       {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Concerns</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalConcerns}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Body Regions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{merged.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Concerns</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeCount}</div>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-between">
+        <div className="grid gap-4 sm:grid-cols-3 flex-1">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Concerns</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalConcerns}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Body Regions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{merged.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Active Concerns</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeCount}</div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Master-Detail Layout */}
