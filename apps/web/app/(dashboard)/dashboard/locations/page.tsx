@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Card,
@@ -23,6 +23,8 @@ import {
   ChevronDown,
   ChevronUp,
   Stethoscope,
+  Search,
+  X,
 } from 'lucide-react';
 
 interface Location {
@@ -46,8 +48,10 @@ interface ServiceOption {
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
-  const [locationServices, setLocationServices] = useState<Record<string, string[]>>({});
+  // Tracks which services are DISABLED per location (opt-out model)
+  const [disabledServices, setDisabledServices] = useState<Record<string, string[]>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,7 +94,7 @@ export default function LocationsPage() {
       }));
       setLocations(allLocs);
 
-      // Load services with category names
+      // Load active services with category names
       const { data: svcData } = await supabase
         .from('services')
         .select('id, name, category_id, service_categories(name)')
@@ -105,11 +109,11 @@ export default function LocationsPage() {
       }));
       setServices(svcs);
 
-      // Load location-service links
+      // Load disabled services per location (opt-out model)
       const locationIds = allLocs.map((l) => l.id);
       if (locationIds.length > 0) {
         const { data: links } = await supabase
-          .from('location_services')
+          .from('location_disabled_services')
           .select('location_id, service_id')
           .in('location_id', locationIds);
 
@@ -118,7 +122,7 @@ export default function LocationsPage() {
           if (!map[link.location_id]) map[link.location_id] = [];
           map[link.location_id].push(link.service_id);
         }
-        setLocationServices(map);
+        setDisabledServices(map);
       }
 
       setLoading(false);
@@ -126,6 +130,17 @@ export default function LocationsPage() {
 
     load();
   }, [supabase]);
+
+  // Group services by category for display
+  const servicesByCategory = useMemo(() => {
+    const groups: Record<string, ServiceOption[]> = {};
+    for (const svc of services) {
+      const cat = svc.category_name ?? 'Uncategorized';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(svc);
+    }
+    return groups;
+  }, [services]);
 
   function addLocation() {
     setLocations([
@@ -150,17 +165,28 @@ export default function LocationsPage() {
 
   function removeLocation(id: string) {
     setLocations(locations.filter((l) => l.id !== id));
-    const updated = { ...locationServices };
+    const updated = { ...disabledServices };
     delete updated[id];
-    setLocationServices(updated);
+    setDisabledServices(updated);
   }
 
   function toggleServiceForLocation(locationId: string, serviceId: string) {
-    const current = locationServices[locationId] || [];
-    const updated = current.includes(serviceId)
-      ? current.filter((s) => s !== serviceId)
-      : [...current, serviceId];
-    setLocationServices({ ...locationServices, [locationId]: updated });
+    const currentDisabled = disabledServices[locationId] || [];
+    const updated = currentDisabled.includes(serviceId)
+      ? currentDisabled.filter((s) => s !== serviceId) // re-enable
+      : [...currentDisabled, serviceId]; // disable
+    setDisabledServices({ ...disabledServices, [locationId]: updated });
+  }
+
+  function enableAllForLocation(locationId: string) {
+    setDisabledServices({ ...disabledServices, [locationId]: [] });
+  }
+
+  function disableAllForLocation(locationId: string) {
+    setDisabledServices({
+      ...disabledServices,
+      [locationId]: services.map((s) => s.id),
+    });
   }
 
   async function handleSave() {
@@ -190,24 +216,22 @@ export default function LocationsPage() {
         .insert(locationRows)
         .select('id, name');
 
-      // Map old IDs to new IDs for service links
       if (insertedLocs) {
-        const allServiceLinks: { location_id: string; service_id: string }[] = [];
+        const allDisabledLinks: { location_id: string; service_id: string }[] = [];
 
-        // Match by name order since we re-inserted in same order
         const validLocations = locations.filter((l) => l.name.trim());
         for (let i = 0; i < insertedLocs.length; i++) {
           const oldId = validLocations[i]?.id;
           const newId = insertedLocs[i].id;
-          const serviceIds = locationServices[oldId] || [];
-          for (const serviceId of serviceIds) {
-            allServiceLinks.push({ location_id: newId, service_id: serviceId });
+          const disabled = disabledServices[oldId] || [];
+          for (const serviceId of disabled) {
+            allDisabledLinks.push({ location_id: newId, service_id: serviceId });
           }
         }
 
-        // Delete old location_services and insert new ones
-        if (allServiceLinks.length > 0) {
-          await supabase.from('location_services').insert(allServiceLinks);
+        // Insert disabled service links
+        if (allDisabledLinks.length > 0) {
+          await supabase.from('location_disabled_services').insert(allDisabledLinks);
         }
       }
     }
@@ -258,7 +282,10 @@ export default function LocationsPage() {
         <div className="space-y-4">
           {locations.map((loc) => {
             const isExpanded = expandedId === loc.id;
-            const assignedCount = (locationServices[loc.id] || []).length;
+            const disabled = disabledServices[loc.id] || [];
+            const disabledCount = disabled.length;
+            const enabledCount = services.length - disabledCount;
+            const searchLower = serviceSearch.toLowerCase();
 
             return (
               <Card key={loc.id}>
@@ -282,10 +309,13 @@ export default function LocationsPage() {
                           Primary
                         </Badge>
                       )}
-                      {assignedCount > 0 && (
-                        <Badge variant="outline" className="text-xs">
+                      {services.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${disabledCount > 0 ? 'border-amber-300 text-amber-700 bg-amber-50' : ''}`}
+                        >
                           <Stethoscope className="h-3 w-3 mr-1" />
-                          {assignedCount} service{assignedCount !== 1 ? 's' : ''}
+                          {enabledCount}/{services.length} active
                         </Badge>
                       )}
                     </div>
@@ -392,62 +422,136 @@ export default function LocationsPage() {
                       </div>
                     </div>
 
-                    {/* Services offered */}
+                    {/* Services — opt-out model */}
                     {services.length > 0 && (
                       <>
                         <Separator />
                         <div>
-                          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                            <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                            Services Offered
-                          </h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-medium flex items-center gap-2">
+                              <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                              Services Available
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => enableAllForLocation(loc.id)}
+                              >
+                                Enable All
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground"
+                                onClick={() => disableAllForLocation(loc.id)}
+                              >
+                                Disable All
+                              </Button>
+                            </div>
+                          </div>
                           <p className="text-xs text-muted-foreground mb-3">
-                            Select which services are available at this location
+                            All services from your catalog are enabled by default. Toggle off any services not available at this location.
                           </p>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {services.map((svc) => {
-                              const isAssigned = (
-                                locationServices[loc.id] || []
-                              ).includes(svc.id);
-                              return (
+
+                          {/* Search filter */}
+                          {services.length > 8 && (
+                            <div className="relative mb-3">
+                              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                value={serviceSearch}
+                                onChange={(e) => setServiceSearch(e.target.value)}
+                                placeholder="Filter services..."
+                                className="pl-8 h-8 text-xs"
+                              />
+                              {serviceSearch && (
                                 <button
-                                  key={svc.id}
                                   type="button"
-                                  onClick={() =>
-                                    toggleServiceForLocation(loc.id, svc.id)
-                                  }
-                                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
-                                    isAssigned
-                                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                      : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                                  }`}
+                                  onClick={() => setServiceSearch('')}
+                                  className="absolute right-2.5 top-2.5"
                                 >
-                                  <div
-                                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                                      isAssigned
-                                        ? 'border-indigo-500 bg-indigo-500'
-                                        : 'border-slate-300'
-                                    }`}
-                                  >
-                                    {isAssigned && (
-                                      <Check className="h-3 w-3 text-white" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <span className="block truncate font-medium">
-                                      {svc.name}
-                                    </span>
-                                    {svc.category_name && (
-                                      <span className="block truncate text-xs opacity-70">
-                                        {svc.category_name}
-                                      </span>
-                                    )}
-                                  </div>
+                                  <X className="h-3.5 w-3.5 text-muted-foreground" />
                                 </button>
+                              )}
+                            </div>
+                          )}
+
+                          {disabledCount > 0 && (
+                            <div className="mb-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                              {disabledCount} service{disabledCount !== 1 ? 's' : ''} disabled at this location
+                            </div>
+                          )}
+
+                          <div className="space-y-4">
+                            {Object.entries(servicesByCategory).map(([category, catServices]) => {
+                              const filtered = searchLower
+                                ? catServices.filter(
+                                    (s) =>
+                                      s.name.toLowerCase().includes(searchLower) ||
+                                      (s.category_name ?? '').toLowerCase().includes(searchLower)
+                                  )
+                                : catServices;
+                              if (filtered.length === 0) return null;
+
+                              return (
+                                <div key={category}>
+                                  <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                                    {category}
+                                  </h5>
+                                  <div className="grid gap-1.5 sm:grid-cols-2">
+                                    {filtered.map((svc) => {
+                                      const isDisabled = disabled.includes(svc.id);
+                                      const isEnabled = !isDisabled;
+                                      return (
+                                        <button
+                                          key={svc.id}
+                                          type="button"
+                                          onClick={() =>
+                                            toggleServiceForLocation(loc.id, svc.id)
+                                          }
+                                          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                                            isEnabled
+                                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                              : 'border-slate-200 bg-slate-50 text-slate-400 line-through'
+                                          }`}
+                                        >
+                                          <div
+                                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                              isEnabled
+                                                ? 'border-indigo-500 bg-indigo-500'
+                                                : 'border-slate-300'
+                                            }`}
+                                          >
+                                            {isEnabled && (
+                                              <Check className="h-3 w-3 text-white" />
+                                            )}
+                                          </div>
+                                          <span className="block truncate font-medium">
+                                            {svc.name}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
                         </div>
+                      </>
+                    )}
+
+                    {services.length === 0 && (
+                      <>
+                        <Separator />
+                        <p className="text-xs text-muted-foreground">
+                          No services configured yet. Add services from the{' '}
+                          <a href="/dashboard/widget/services" className="underline">
+                            Services page
+                          </a>{' '}
+                          to manage availability per location.
+                        </p>
                       </>
                     )}
                   </CardContent>

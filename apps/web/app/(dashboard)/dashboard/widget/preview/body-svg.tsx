@@ -48,14 +48,22 @@ const MALE_ANCHORS: BodyAnchor[] = [
 
 // Female back view — 200 x 665
 const FEMALE_BACK_ANCHORS: BodyAnchor[] = [
+  { id: 'neck', label: 'Neck', x: 100, y: 88, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'back', label: 'Back', x: 100, y: 185, labelSide: 'right', regionSlugs: ['back'] },
+  { id: 'arms', label: 'Arms', x: 27, y: 245, labelSide: 'left', regionSlugs: ['arms'] },
   { id: 'buttocks', label: 'Buttocks', x: 100, y: 330, labelSide: 'right', regionSlugs: ['buttocks'] },
+  { id: 'thighs', label: 'Thighs', x: 122, y: 440, labelSide: 'right', regionSlugs: ['thighs'] },
+  { id: 'lower-legs', label: 'Lower Legs', x: 78, y: 560, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
 // Male back view — 200 x 608
 const MALE_BACK_ANCHORS: BodyAnchor[] = [
+  { id: 'neck', label: 'Neck', x: 100, y: 82, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'back', label: 'Back', x: 100, y: 175, labelSide: 'right', regionSlugs: ['back'] },
+  { id: 'arms', label: 'Arms', x: 22, y: 228, labelSide: 'left', regionSlugs: ['arms'] },
   { id: 'buttocks', label: 'Buttocks', x: 100, y: 310, labelSide: 'right', regionSlugs: ['buttocks'] },
+  { id: 'thighs', label: 'Thighs', x: 125, y: 408, labelSide: 'right', regionSlugs: ['thighs'] },
+  { id: 'lower-legs', label: 'Lower Legs', x: 75, y: 520, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
 // Region-appropriate highlight radii

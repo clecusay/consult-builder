@@ -134,16 +134,16 @@ export async function GET(request: Request) {
     .order('display_order');
   allTenantServices = tenantServices || [];
 
-  // If a location is specified, filter services to only those offered at that location
+  // If a location is specified, filter out services that are disabled at that location
   if (locationId && allTenantServices.length > 0) {
-    const { data: locationServiceLinks } = await supabase
-      .from('location_services')
+    const { data: disabledLinks } = await supabase
+      .from('location_disabled_services')
       .select('service_id')
       .eq('location_id', locationId);
 
-    if (locationServiceLinks && locationServiceLinks.length > 0) {
-      const locationServiceIds = new Set(locationServiceLinks.map((l: { service_id: string }) => l.service_id));
-      allTenantServices = allTenantServices.filter(s => locationServiceIds.has(s.id));
+    if (disabledLinks && disabledLinks.length > 0) {
+      const disabledIds = new Set(disabledLinks.map((l: { service_id: string }) => l.service_id));
+      allTenantServices = allTenantServices.filter(s => !disabledIds.has(s.id));
     }
   }
 
