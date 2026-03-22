@@ -35,14 +35,18 @@ export default function SignupPage() {
     setLoading(true);
 
     // Sign up the user
+    const trimmedEmail = email.trim();
+    const trimmedName = fullName.trim();
+    const trimmedCenter = centerName.trim();
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
+      email: trimmedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
-          full_name: fullName,
-          center_name: centerName,
+          full_name: trimmedName,
+          center_name: trimmedCenter,
         },
       },
     });

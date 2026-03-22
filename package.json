@@ -5,15 +5,29 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
+    "test": "pnpm test:web && pnpm test:widget",
+    "test:web": "pnpm --filter web exec vitest run",
+    "test:widget": "pnpm --filter widget exec vitest run",
+    "test:unit": "pnpm --filter web exec vitest run unit && pnpm --filter widget exec vitest run unit",
+    "test:integration": "pnpm --filter web exec vitest run integration",
+    "test:e2e": "playwright test",
+    "test:watch": "pnpm --filter web exec vitest",
     "db:migrate": "supabase db push",
     "db:seed": "supabase db seed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "turbo": "^2.4.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.0"
   },
   "packageManager": "pnpm@10.29.3",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

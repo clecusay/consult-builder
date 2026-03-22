@@ -24,7 +24,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
 
@@ -47,7 +47,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: email.trim(),
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },

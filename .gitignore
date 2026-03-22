@@ -29,6 +29,10 @@ supabase/.temp/
 Thumbs.db
 Screenshot*
 
+# Makefile runtime
+.pids/
+.logs/
+
 # Turbo
 .turbo/
 
