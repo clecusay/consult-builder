@@ -26,9 +26,12 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from '@/lib/webhooks/format';
+
 interface IntegrationConfig {
   webhook_url: string;
   webhook_secret: string;
+  webhook_format: WebhookFormat;
   notification_emails: string[];
   allowed_origins: string[];
 }
@@ -37,6 +40,7 @@ export default function IntegrationSettingsPage() {
   const [config, setConfig] = useState<IntegrationConfig>({
     webhook_url: '',
     webhook_secret: '',
+    webhook_format: 'generic',
     notification_emails: [],
     allowed_origins: [],
   });
@@ -70,7 +74,7 @@ export default function IntegrationSettingsPage() {
       const { data: widgetConfig } = await supabase
         .from('widget_configs')
         .select(
-          'webhook_url, webhook_secret, notification_emails, allowed_origins'
+          'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins'
         )
         .eq('tenant_id', profile.tenant_id)
         .single();
@@ -79,6 +83,7 @@ export default function IntegrationSettingsPage() {
         setConfig({
           webhook_url: widgetConfig.webhook_url ?? '',
           webhook_secret: widgetConfig.webhook_secret ?? '',
+          webhook_format: (widgetConfig.webhook_format as WebhookFormat) ?? 'generic',
           notification_emails: widgetConfig.notification_emails ?? [],
           allowed_origins: widgetConfig.allowed_origins ?? [],
         });
@@ -99,6 +104,7 @@ export default function IntegrationSettingsPage() {
       .update({
         webhook_url: config.webhook_url || null,
         webhook_secret: config.webhook_secret || null,
+        webhook_format: config.webhook_format,
         notification_emails: config.notification_emails,
         allowed_origins: config.allowed_origins,
       })
@@ -115,14 +121,15 @@ export default function IntegrationSettingsPage() {
     setTestResult(null);
 
     try {
+      const testPayload = formatWebhookPayload(config.webhook_format, {
+        event: 'test',
+        timestamp: new Date().toISOString(),
+        message: 'This is a test webhook from Consult Builder.',
+      });
       const response = await fetch(config.webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'test',
-          timestamp: new Date().toISOString(),
-          message: 'This is a test webhook from Consult Builder.',
-        }),
+        body: JSON.stringify(testPayload),
       });
       setTestResult(
         response.ok
@@ -240,6 +247,24 @@ export default function IntegrationSettingsPage() {
             />
             <p className="text-xs text-muted-foreground">
               Used to verify the webhook payload signature
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="webhook_format">Payload Format</Label>
+            <select
+              id="webhook_format"
+              value={config.webhook_format}
+              onChange={(e) =>
+                setConfig({ ...config, webhook_format: e.target.value as WebhookFormat })
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="generic">Generic JSON</option>
+              <option value="discord">Discord</option>
+              <option value="slack">Slack</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Choose the format that matches your webhook receiver. Discord and Slack skip HMAC signing.
             </p>
           </div>
           <div className="flex items-center gap-3">

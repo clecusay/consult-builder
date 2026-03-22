@@ -34,7 +34,7 @@ create_user() {
       }
     }" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
-  echo "  Created: ${email} -> ${user_id}"
+  echo "  Created: ${email} -> ${user_id}" >&2
   echo "${user_id}"
 }
 
@@ -139,12 +139,12 @@ INSERT INTO user_profiles (user_id, tenant_id, role, full_name) VALUES
 -- ============================================================
 -- 3. WIDGET CONFIGS (with Discord webhook)
 -- ============================================================
-INSERT INTO widget_configs (tenant_id, webhook_url, widget_mode, diagram_type, primary_color, secondary_color, accent_color) VALUES
-  (t1_id, '${DISCORD_WEBHOOK}', 'regions_concerns', 'face',      '#1a1a2e', '#16213e', '#0f3460'),
-  (t2_id, '${DISCORD_WEBHOOK}', 'regions_concerns', 'face',      '#2563eb', '#1d4ed8', '#1e40af'),
-  (t3_id, '${DISCORD_WEBHOOK}', 'regions_concerns', 'face',      '#ec4899', '#db2777', '#be185d'),
-  (t4_id, '${DISCORD_WEBHOOK}', 'regions_concerns', 'body',      '#059669', '#047857', '#065f46'),
-  (t5_id, '${DISCORD_WEBHOOK}', 'regions_concerns', 'full_body', '#8b5cf6', '#7c3aed', '#6d28d9');
+INSERT INTO widget_configs (tenant_id, webhook_url, webhook_format, widget_mode, diagram_type, primary_color, secondary_color, accent_color) VALUES
+  (t1_id, '${DISCORD_WEBHOOK}', 'discord', 'regions_concerns', 'face',      '#1a1a2e', '#16213e', '#0f3460'),
+  (t2_id, '${DISCORD_WEBHOOK}', 'discord', 'regions_concerns', 'face',      '#2563eb', '#1d4ed8', '#1e40af'),
+  (t3_id, '${DISCORD_WEBHOOK}', 'discord', 'regions_concerns', 'face',      '#ec4899', '#db2777', '#be185d'),
+  (t4_id, '${DISCORD_WEBHOOK}', 'discord', 'regions_concerns', 'body',      '#059669', '#047857', '#065f46'),
+  (t5_id, '${DISCORD_WEBHOOK}', 'discord', 'regions_concerns', 'full_body', '#8b5cf6', '#7c3aed', '#6d28d9');
 
 -- ============================================================
 -- 4. TENANT LOCATIONS

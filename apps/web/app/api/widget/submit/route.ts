@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from '@/lib/webhooks/format';
 import { z } from 'zod';
 
 const submissionSchema = z.object({
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     // Get widget config for webhook
     const { data: config } = await supabase
       .from('widget_configs')
-      .select('webhook_url, webhook_secret, notification_emails')
+      .select('webhook_url, webhook_secret, webhook_format, notification_emails')
       .eq('tenant_id', tenant.id)
       .single();
 
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
 
     // Fire webhook (non-blocking)
     if (config?.webhook_url) {
-      fireWebhook(supabase, submission.id, config.webhook_url, config.webhook_secret, {
+      fireWebhook(supabase, submission.id, config.webhook_url, config.webhook_secret, (config.webhook_format as WebhookFormat) ?? 'generic', {
         event: 'submission.created',
         submission: {
           id: submission.id,
@@ -171,15 +172,17 @@ async function fireWebhook(
   submissionId: string,
   webhookUrl: string,
   webhookSecret: string | null,
+  webhookFormat: WebhookFormat,
   payload: Record<string, unknown>
 ) {
   try {
-    const body = JSON.stringify(payload);
+    const formatted = formatWebhookPayload(webhookFormat, payload);
+    const body = JSON.stringify(formatted);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    if (webhookSecret) {
+    if (webhookSecret && !shouldSkipSigning(webhookFormat)) {
       const encoder = new TextEncoder();
       const key = await crypto.subtle.importKey(
         'raw',

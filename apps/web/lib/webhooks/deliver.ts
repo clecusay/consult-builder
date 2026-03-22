@@ -1,3 +1,5 @@
+import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from './format';
+
 /**
  * Webhook delivery with HMAC-SHA256 signing.
  * Used for delivering form submissions to tenant webhook URLs.
@@ -5,15 +7,17 @@
 export async function deliverWebhook(
   url: string,
   secret: string | null,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  format: WebhookFormat = 'generic'
 ): Promise<{ ok: boolean; status: number }> {
-  const body = JSON.stringify(payload);
+  const formatted = formatWebhookPayload(format, payload);
+  const body = JSON.stringify(formatted);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'TreatmentBuilder-Webhook/1.0',
   };
 
-  if (secret) {
+  if (secret && !shouldSkipSigning(format)) {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
