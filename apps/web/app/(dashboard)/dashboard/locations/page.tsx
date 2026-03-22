@@ -194,12 +194,47 @@ export default function LocationsPage() {
     setSaving(true);
     setSaved(false);
 
-    // Delete all existing locations and re-insert
-    await supabase.from('tenant_locations').delete().eq('tenant_id', tenantId);
+    const validLocations = locations.filter((l) => l.name.trim());
 
-    const locationRows = locations
-      .filter((l) => l.name.trim())
-      .map((l) => ({
+    // Separate existing locations (update) from new ones (insert)
+    const toUpdate = validLocations.filter((l) => !l.isNew);
+    const toInsert = validLocations.filter((l) => l.isNew);
+    const keepIds = new Set(toUpdate.map((l) => l.id));
+
+    // Delete locations that were removed (not in the current list)
+    const { data: existingLocs } = await supabase
+      .from('tenant_locations')
+      .select('id')
+      .eq('tenant_id', tenantId);
+
+    const toDeleteIds = (existingLocs || [])
+      .map((l) => l.id)
+      .filter((id) => !keepIds.has(id));
+
+    if (toDeleteIds.length > 0) {
+      await supabase.from('tenant_locations').delete().in('id', toDeleteIds);
+    }
+
+    // Update existing locations
+    for (const loc of toUpdate) {
+      await supabase
+        .from('tenant_locations')
+        .update({
+          name: loc.name.trim(),
+          address: loc.address.trim() || null,
+          city: loc.city.trim() || null,
+          state: loc.state.trim() || null,
+          zip: loc.zip.trim() || null,
+          phone: loc.phone.trim() || null,
+          is_primary: loc.is_primary,
+        })
+        .eq('id', loc.id);
+    }
+
+    // Insert new locations
+    let insertedLocs: { id: string; name: string }[] = [];
+    if (toInsert.length > 0) {
+      const insertRows = toInsert.map((l) => ({
         tenant_id: tenantId,
         name: l.name.trim(),
         address: l.address.trim() || null,
@@ -210,35 +245,64 @@ export default function LocationsPage() {
         is_primary: l.is_primary,
       }));
 
-    if (locationRows.length > 0) {
-      const { data: insertedLocs } = await supabase
+      const { data } = await supabase
         .from('tenant_locations')
-        .insert(locationRows)
+        .insert(insertRows)
         .select('id, name');
 
-      if (insertedLocs) {
-        const allDisabledLinks: { location_id: string; service_id: string }[] = [];
+      insertedLocs = data || [];
+    }
 
-        const validLocations = locations.filter((l) => l.name.trim());
-        for (let i = 0; i < insertedLocs.length; i++) {
-          const oldId = validLocations[i]?.id;
-          const newId = insertedLocs[i].id;
-          const disabled = disabledServices[oldId] || [];
-          for (const serviceId of disabled) {
-            allDisabledLinks.push({ location_id: newId, service_id: serviceId });
-          }
-        }
+    // Rebuild disabled services for all locations
+    // Delete existing disabled service links for this tenant's locations
+    const allLocationIds = [
+      ...toUpdate.map((l) => l.id),
+      ...insertedLocs.map((l) => l.id),
+    ];
+    if (allLocationIds.length > 0) {
+      await supabase.from('location_disabled_services').delete().in('location_id', allLocationIds);
+    }
 
-        // Insert disabled service links
-        if (allDisabledLinks.length > 0) {
-          await supabase.from('location_disabled_services').insert(allDisabledLinks);
-        }
+    const allDisabledLinks: { location_id: string; service_id: string }[] = [];
+
+    // Existing locations keep their IDs
+    for (const loc of toUpdate) {
+      const disabled = disabledServices[loc.id] || [];
+      for (const serviceId of disabled) {
+        allDisabledLinks.push({ location_id: loc.id, service_id: serviceId });
       }
+    }
+
+    // New locations map from old temp ID to new DB ID
+    for (let i = 0; i < toInsert.length; i++) {
+      const oldId = toInsert[i].id;
+      const newId = insertedLocs[i]?.id;
+      if (!newId) continue;
+      const disabled = disabledServices[oldId] || [];
+      for (const serviceId of disabled) {
+        allDisabledLinks.push({ location_id: newId, service_id: serviceId });
+      }
+    }
+
+    // Insert disabled service links
+    if (allDisabledLinks.length > 0) {
+      await supabase.from('location_disabled_services').insert(allDisabledLinks);
     }
 
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+
+    // Refresh locations to get correct IDs for newly inserted ones
+    const { data: refreshed } = await supabase
+      .from('tenant_locations')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('is_primary', { ascending: false })
+      .order('name');
+    if (refreshed) {
+      setLocations(refreshed.map((l) => ({ ...l, address: l.address || '', city: l.city || '', state: l.state || '', zip: l.zip || '', phone: l.phone || '' })));
+    }
   }
 
   if (loading) {

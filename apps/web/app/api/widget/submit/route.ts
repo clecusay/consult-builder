@@ -5,9 +5,9 @@ import { z } from 'zod';
 const submissionSchema = z.object({
   tenant_id: z.string().uuid(),
   location_id: z.string().uuid().optional(),
-  first_name: z.string().max(100).default(''),
-  last_name: z.string().max(100).default(''),
-  email: z.union([z.string().email(), z.literal('')]).default(''),
+  first_name: z.string().min(1, 'First name is required').max(100),
+  last_name: z.string().min(1, 'Last name is required').max(100),
+  email: z.string().min(1, 'Email is required').email('Invalid email address'),
   phone: z.string().optional(),
   gender: z.enum(['female', 'male', 'all']),
   selected_regions: z.array(
@@ -16,7 +16,7 @@ const submissionSchema = z.object({
       region_name: z.string(),
       region_slug: z.string(),
     })
-  ),
+  ).min(1, 'At least one body region must be selected'),
   selected_concerns: z.array(
     z.object({
       concern_id: z.string().uuid(),

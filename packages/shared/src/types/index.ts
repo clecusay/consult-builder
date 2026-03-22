@@ -271,6 +271,15 @@ export interface WidgetConfigResponse {
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];
   form_fields: WidgetFormField[];
+  locations: WidgetLocation[];
+}
+
+export interface WidgetLocation {
+  id: string;
+  name: string;
+  is_primary: boolean;
+  city: string | null;
+  state: string | null;
 }
 
 export interface WidgetServiceCategory {

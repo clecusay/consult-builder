@@ -62,6 +62,14 @@ export async function GET(request: Request) {
   const modeIncludesServices = widgetMode.includes('services');
   const modeIncludesConcerns = widgetMode.includes('concerns');
 
+  // Fetch tenant locations
+  const { data: tenantLocations } = await supabase
+    .from('tenant_locations')
+    .select('id, name, is_primary, city, state')
+    .eq('tenant_id', tenant.id)
+    .order('is_primary', { ascending: false })
+    .order('name');
+
   // Fetch body regions: tenant-specific first, then platform defaults
   // Tenant overrides have the same slug, so we prefer tenant-specific rows.
   // We must fetch ALL tenant overrides (including inactive) so disabled
@@ -333,6 +341,7 @@ export async function GET(request: Request) {
     regions,
     service_categories: serviceCategories,
     form_fields: (formFields && formFields.length > 0) ? formFields : DEFAULT_FORM_FIELDS,
+    locations: (tenantLocations || []).map(loc => ({ id: loc.id, name: loc.name, is_primary: loc.is_primary, city: loc.city, state: loc.state })),
   };
 
   // Cache for 60 seconds
