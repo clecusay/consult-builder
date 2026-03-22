@@ -45,10 +45,11 @@ const FLOW_OPTIONS: {
 ];
 
 interface Props {
+  tenantId: string;
   slug: string;
 }
 
-export function PreviewWithFlowSelector({ slug }: Props) {
+export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedFlow, setSelectedFlow] = useState<WidgetMode>('regions_concerns');
 
   const selectedOption = FLOW_OPTIONS.find((o) => o.mode === selectedFlow)!;
@@ -118,7 +119,7 @@ export function PreviewWithFlowSelector({ slug }: Props) {
         </div>
 
         {/* Live Preview */}
-        <WidgetPreviewClient slug={slug} widgetModeOverride={selectedFlow} />
+        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} />
       </Card>
     </div>
   );

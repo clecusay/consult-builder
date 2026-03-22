@@ -145,7 +145,7 @@ export default function SettingsPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Used in widget embed code and API calls
+              Used in widget preview URL
             </p>
           </div>
 

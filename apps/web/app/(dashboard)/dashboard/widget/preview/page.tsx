@@ -16,6 +16,7 @@ import { PreviewWithFlowSelector } from './preview-with-flow-selector';
 export default async function WidgetPreviewPage() {
   const session = await requireSession();
   const slug = session.tenant.slug;
+  const tenantId = session.tenant.id;
 
   return (
     <div className="space-y-6">
@@ -59,7 +60,7 @@ export default async function WidgetPreviewPage() {
             </div>
           }
         >
-          <PreviewWithFlowSelector slug={slug} />
+          <PreviewWithFlowSelector tenantId={tenantId} slug={slug} />
         </Suspense>
       </PreviewErrorBoundary>
 

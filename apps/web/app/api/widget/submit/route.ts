@@ -3,7 +3,8 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 const submissionSchema = z.object({
-  tenant_slug: z.string().min(1),
+  tenant_id: z.string().uuid(),
+  location_id: z.string().uuid().optional(),
   first_name: z.string().max(100).default(''),
   last_name: z.string().max(100).default(''),
   email: z.union([z.string().email(), z.literal('')]).default(''),
@@ -52,16 +53,29 @@ export async function POST(request: Request) {
     const data = parsed.data;
     const supabase = await createServiceRoleClient();
 
-    // Look up tenant
+    // Verify tenant exists and is active
     const { data: tenant } = await supabase
       .from('tenants')
       .select('id, status')
-      .eq('slug', data.tenant_slug)
+      .eq('id', data.tenant_id)
       .eq('status', 'active')
       .single();
 
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // Validate location belongs to tenant when provided
+    if (data.location_id) {
+      const { data: location } = await supabase
+        .from('tenant_locations')
+        .select('id')
+        .eq('id', data.location_id)
+        .eq('tenant_id', tenant.id)
+        .single();
+      if (!location) {
+        return NextResponse.json({ error: 'Location not found for this tenant' }, { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } });
+      }
     }
 
     // Get widget config for webhook
@@ -81,6 +95,7 @@ export async function POST(request: Request) {
       .from('form_submissions')
       .insert({
         tenant_id: tenant.id,
+        location_id: data.location_id || null,
         first_name: data.first_name,
         last_name: data.last_name,
         email: data.email,
@@ -108,6 +123,8 @@ export async function POST(request: Request) {
         event: 'submission.created',
         submission: {
           id: submission.id,
+          tenant_id: tenant.id,
+          location_id: data.location_id || null,
           first_name: data.first_name,
           last_name: data.last_name,
           email: data.email,

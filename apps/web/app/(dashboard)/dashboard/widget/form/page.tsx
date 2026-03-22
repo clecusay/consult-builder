@@ -30,6 +30,7 @@ import {
 
 interface CustomField {
   id: string;
+  field_key: string | null;
   label: string;
   field_type: string;
   is_required: boolean;
@@ -37,6 +38,10 @@ interface CustomField {
   options: string[] | null;
   isNew?: boolean;
 }
+
+/** field_keys that are always present (managed outside presets/custom) */
+const SYSTEM_FIELD_KEYS = new Set(['first_name', 'last_name', 'email', 'sms_opt_in', 'email_opt_in']);
+const PRESET_FIELD_KEYS = new Set(['phone', 'date_of_birth', 'procedure']);
 
 interface PresetField {
   key: string;
@@ -133,7 +138,7 @@ export default function FormFieldsPage() {
       // Fetch existing form fields
       const { data: existingFields } = await supabase
         .from('form_fields')
-        .select('id, label, field_type, is_required, display_order, options')
+        .select('id, field_key, label, field_type, is_required, display_order, options')
         .eq('tenant_id', profile.tenant_id)
         .order('display_order', { ascending: true });
 
@@ -164,20 +169,21 @@ export default function FormFieldsPage() {
       const savedServiceNames = new Set<string>();
 
       for (const f of allFields) {
-        if (f.label === 'Phone Number' && f.field_type === 'phone') {
+        // Skip system fields (first_name, last_name, email, opt-ins) — always present
+        if (f.field_key && SYSTEM_FIELD_KEYS.has(f.field_key)) continue;
+
+        // Detect presets by field_key (reliable) or fallback to label matching
+        if (f.field_key === 'phone' || (f.label === 'Phone Number' && f.field_type === 'phone')) {
           presetState.phone = true;
-        } else if (f.label === 'Date of Birth' && f.field_type === 'date') {
+        } else if (f.field_key === 'date_of_birth' || (f.label === 'Date of Birth' && f.field_type === 'date')) {
           presetState.date_of_birth = true;
-        } else if (f.label === 'Procedure' && f.field_type === 'select') {
+        } else if (f.field_key === 'procedure' || (f.label === 'Procedure' && f.field_type === 'select')) {
           presetState.procedure = true;
-          // Load previously saved options
           const opts = f.options ?? [];
           setProcedureOptions(opts);
-          // Match saved options to active service IDs
           for (const svc of svcList) {
             if (opts.includes(svc.name)) savedServiceNames.add(svc.id);
           }
-          // Also keep any custom procedure names that aren't in active services
         } else {
           customOnly.push(f);
         }
@@ -233,6 +239,7 @@ export default function FormFieldsPage() {
       ...fields,
       {
         id: `new-${Date.now()}`,
+        field_key: null,
         label: '',
         field_type: 'text',
         is_required: false,
@@ -259,65 +266,46 @@ export default function FormFieldsPage() {
     // Delete all existing form_fields for this tenant and re-insert
     await supabase.from('form_fields').delete().eq('tenant_id', tenantId);
 
-    const allRows: {
+    type FormFieldRow = {
       tenant_id: string;
+      field_key: string | null;
       label: string;
       field_type: string;
+      placeholder: string | null;
       is_required: boolean;
       display_order: number;
       options: string[] | null;
-    }[] = [];
+    };
+    const allRows: FormFieldRow[] = [];
+    let order = 0;
 
-    let order = 1;
+    // ── 1. Default system fields (always at the start) ──
+    allRows.push({ tenant_id: tenantId, field_key: 'first_name', label: 'First Name', field_type: 'text', placeholder: 'Jane', is_required: true, display_order: order++, options: null });
+    allRows.push({ tenant_id: tenantId, field_key: 'last_name', label: 'Last Name', field_type: 'text', placeholder: 'Doe', is_required: true, display_order: order++, options: null });
+    allRows.push({ tenant_id: tenantId, field_key: 'email', label: 'Email', field_type: 'email', placeholder: 'jane@example.com', is_required: true, display_order: order++, options: null });
 
-    // Add enabled presets
+    // ── 2. Enabled preset fields ──
     if (enabledPresets.phone) {
-      allRows.push({
-        tenant_id: tenantId,
-        label: 'Phone Number',
-        field_type: 'phone',
-        is_required: false,
-        display_order: order++,
-        options: null,
-      });
+      allRows.push({ tenant_id: tenantId, field_key: 'phone', label: 'Phone Number', field_type: 'phone', placeholder: '(555) 555-5555', is_required: false, display_order: order++, options: null });
     }
     if (enabledPresets.date_of_birth) {
-      allRows.push({
-        tenant_id: tenantId,
-        label: 'Date of Birth',
-        field_type: 'date',
-        is_required: false,
-        display_order: order++,
-        options: null,
-      });
+      allRows.push({ tenant_id: tenantId, field_key: 'date_of_birth', label: 'Date of Birth', field_type: 'date', placeholder: null, is_required: false, display_order: order++, options: null });
     }
     if (enabledPresets.procedure) {
-      allRows.push({
-        tenant_id: tenantId,
-        label: 'Procedure',
-        field_type: 'select',
-        is_required: false,
-        display_order: order++,
-        options: procedureOptions.length > 0 ? procedureOptions : null,
-      });
+      allRows.push({ tenant_id: tenantId, field_key: 'procedure', label: 'Procedure', field_type: 'select', placeholder: null, is_required: false, display_order: order++, options: procedureOptions.length > 0 ? procedureOptions : null });
     }
 
-    // Add custom fields
+    // ── 3. Custom fields ──
     for (const f of fields) {
       if (!f.label.trim()) continue;
-      allRows.push({
-        tenant_id: tenantId,
-        label: f.label.trim(),
-        field_type: f.field_type,
-        is_required: f.is_required,
-        display_order: order++,
-        options: f.options,
-      });
+      allRows.push({ tenant_id: tenantId, field_key: null, label: f.label.trim(), field_type: f.field_type, placeholder: null, is_required: f.is_required, display_order: order++, options: f.options });
     }
 
-    if (allRows.length > 0) {
-      await supabase.from('form_fields').insert(allRows);
-    }
+    // ── 4. Opt-in fields (always at the end) ──
+    allRows.push({ tenant_id: tenantId, field_key: 'sms_opt_in', label: 'SMS Opt-In', field_type: 'checkbox', placeholder: 'I agree to receive SMS text messages with appointment reminders, promotions, and special offers. Message & data rates may apply. Reply STOP to unsubscribe.', is_required: false, display_order: 100, options: null });
+    allRows.push({ tenant_id: tenantId, field_key: 'email_opt_in', label: 'Email Opt-In', field_type: 'checkbox', placeholder: 'I would like to receive email updates including exclusive promotions, new treatment announcements, and helpful skincare tips. Unsubscribe anytime.', is_required: false, display_order: 101, options: null });
+
+    await supabase.from('form_fields').insert(allRows);
 
     setSaving(false);
     setSaved(true);

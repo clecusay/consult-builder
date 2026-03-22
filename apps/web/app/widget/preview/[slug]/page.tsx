@@ -28,7 +28,7 @@ export default async function WidgetStandalonePreview({ params }: Props) {
   const supabase = await createServiceRoleClient();
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name')
+    .select('id, name')
     .eq('slug', slug)
     .eq('status', 'active')
     .single();
@@ -46,7 +46,7 @@ export default async function WidgetStandalonePreview({ params }: Props) {
       <div className="mx-auto max-w-[800px] px-5 py-10">
         <div
           dangerouslySetInnerHTML={{
-            __html: `<treatment-builder data-tenant="${slug}"></treatment-builder>`,
+            __html: `<treatment-builder data-tenant-id="${tenant.id}"></treatment-builder>`,
           }}
         />
       </div>
@@ -57,8 +57,8 @@ export default async function WidgetStandalonePreview({ params }: Props) {
           <summary className="cursor-pointer px-4 py-3 text-xs font-medium text-slate-500 hover:text-slate-700">Embed Code</summary>
           <div className="rounded-b-lg bg-slate-800 p-4 font-mono text-[13px] text-slate-400 overflow-x-auto">
             <span className="text-sky-300">&lt;treatment-builder</span>{' '}
-            <span className="text-amber-200">data-tenant</span>=
-            <span className="text-green-300">&quot;{slug}&quot;</span>
+            <span className="text-amber-200">data-tenant-id</span>=
+            <span className="text-green-300">&quot;{tenant.id}&quot;</span>
             <span className="text-sky-300">&gt;&lt;/treatment-builder&gt;</span>
             <br />
             <span className="text-sky-300">&lt;script</span>{' '}
@@ -70,7 +70,7 @@ export default async function WidgetStandalonePreview({ params }: Props) {
         </details>
       </div>
 
-      <Script src="/widget.js" strategy="lazyOnload" />
+      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
     </div>
   );
 }

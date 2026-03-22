@@ -111,7 +111,7 @@ export interface Concern {
 }
 
 // --- Form Field ---
-export type FormFieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'checkbox' | 'radio';
+export type FormFieldType = 'text' | 'email' | 'phone' | 'date' | 'textarea' | 'select' | 'checkbox' | 'radio';
 
 export interface FormField {
   id: string;
@@ -251,6 +251,7 @@ export interface AuditLog {
 // --- Widget Config API Response ---
 export interface WidgetConfigResponse {
   tenant: {
+    id: string;
     name: string;
     slug: string;
     logo_url: string | null;
@@ -323,7 +324,8 @@ export interface WidgetFormField {
 
 // --- Widget Submission Payload ---
 export interface WidgetSubmissionPayload {
-  tenant_slug: string;
+  tenant_id: string;
+  location_id?: string;
   first_name?: string;
   last_name?: string;
   email?: string;

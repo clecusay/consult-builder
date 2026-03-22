@@ -2,22 +2,28 @@ import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import type { WidgetConfigResponse, WidgetRegion, WidgetConcern } from '@treatment-builder/shared';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const slug = searchParams.get('slug');
+  const tenantId = searchParams.get('tenant_id');
   const locationId = searchParams.get('location');
 
-  if (!slug) {
-    return NextResponse.json({ error: 'Missing slug parameter' }, { status: 400 });
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Missing tenant_id parameter' }, { status: 400 });
+  }
+
+  if (!UUID_RE.test(tenantId)) {
+    return NextResponse.json({ error: 'Invalid tenant_id format' }, { status: 400 });
   }
 
   const supabase = await createServiceRoleClient();
 
-  // Fetch tenant
+  // Fetch tenant by ID
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select('id, name, slug, logo_url, status')
-    .eq('slug', slug)
+    .eq('id', tenantId)
     .eq('status', 'active')
     .single();
 
@@ -34,6 +40,22 @@ export async function GET(request: Request) {
 
   if (!config) {
     return NextResponse.json({ error: 'Widget not configured' }, { status: 404 });
+  }
+
+  // Validate location belongs to this tenant when provided
+  if (locationId) {
+    if (!UUID_RE.test(locationId)) {
+      return NextResponse.json({ error: 'Invalid location format' }, { status: 400 });
+    }
+    const { data: location } = await supabase
+      .from('tenant_locations')
+      .select('id')
+      .eq('id', locationId)
+      .eq('tenant_id', tenant.id)
+      .single();
+    if (!location) {
+      return NextResponse.json({ error: 'Location not found for this tenant' }, { status: 404 });
+    }
   }
 
   const widgetMode: string = config.widget_mode || 'regions_concerns';
@@ -291,6 +313,7 @@ export async function GET(request: Request) {
 
   const response: WidgetConfigResponse = {
     tenant: {
+      id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logo_url: tenant.logo_url,

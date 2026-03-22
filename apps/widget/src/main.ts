@@ -25,7 +25,8 @@ class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
   private config: WidgetConfigResponse | null = null;
   private apiBase = '';
-  private tenantSlug = '';
+  private tenantId = '';
+  private locationId: string | null = null;
   private eventsBound = false;
 
   // View state
@@ -51,20 +52,20 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   async connectedCallback() {
-    this.tenantSlug = this.getAttribute('data-tenant') || '';
-    if (!this.tenantSlug) {
-      this.shadow.innerHTML = '<p style="color:red;padding:1rem">Missing data-tenant attribute</p>';
+    this.tenantId = this.getAttribute('data-tenant-id') || '';
+    if (!this.tenantId) {
+      this.shadow.innerHTML = '<p style="color:red;padding:1rem">Missing data-tenant-id attribute</p>';
       return;
     }
-    const locationId = this.getAttribute('data-location') || null;
+    this.locationId = this.getAttribute('data-location') || null;
     const flowOverride = this.getAttribute('data-flow') || null;
     this.apiBase = this.getAttribute('data-api') || '';
 
     this.shadow.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:96px 16px;color:#64748b;font-size:13px">Loading...</div>';
 
     try {
-      let url = `${this.apiBase}/api/widget/config?slug=${encodeURIComponent(this.tenantSlug)}`;
-      if (locationId) url += `&location=${encodeURIComponent(locationId)}`;
+      let url = `${this.apiBase}/api/widget/config?tenant_id=${encodeURIComponent(this.tenantId)}`;
+      if (this.locationId) url += `&location=${encodeURIComponent(this.locationId)}`;
       if (flowOverride) url += `&flow=${encodeURIComponent(flowOverride)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Config error: ${res.status}`);
@@ -532,7 +533,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         </div>
       `;
     } else {
-      const inputType = field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text';
+      const inputType = field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : field.field_type === 'date' ? 'date' : 'text';
       fieldEl = html`<input class="tb-input" type="${inputType}" name="${name}" placeholder="${field.placeholder || ''}" ${req}/>`;
     }
 
@@ -758,7 +759,8 @@ class TreatmentBuilderWidget extends HTMLElement {
     }
 
     const payload: Record<string, unknown> = {
-      tenant_slug: this.tenantSlug,
+      tenant_id: this.tenantId,
+      location_id: this.locationId || undefined,
       first_name: systemValues.first_name || '',
       last_name: systemValues.last_name || '',
       email: systemValues.email || '',

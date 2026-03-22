@@ -57,6 +57,7 @@ function FlowSelect({ value, onChange }: { value: WidgetMode; onChange: (v: Widg
 }
 
 export default function EmbedCodePage() {
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [slug, setSlug] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,14 +77,16 @@ export default function EmbedCodePage() {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('tenant_id, tenants (slug)')
+        .select('tenant_id, tenants (id, slug)')
         .eq('user_id', user.id)
         .single();
 
       if (profile) {
         const tenant = (profile as Record<string, unknown>).tenants as {
+          id: string;
           slug: string;
         };
+        setTenantId(tenant.id);
         setSlug(tenant.slug);
 
         const tenantId = profile.tenant_id;
@@ -123,12 +126,12 @@ export default function EmbedCodePage() {
   }
 
   function embedCode(flow: WidgetMode) {
-    return `<treatment-builder data-tenant="${slug ?? 'YOUR_SLUG'}" data-flow="${flow}"></treatment-builder>
+    return `<treatment-builder data-tenant-id="${tenantId ?? 'YOUR_TENANT_ID'}" data-flow="${flow}"></treatment-builder>
 <script src="https://widget.treatmentbuilder.com/widget.js" defer></script>`;
   }
 
   function locationSnippet(locationId: string, flow: WidgetMode) {
-    return `<treatment-builder data-tenant="${slug ?? 'YOUR_SLUG'}" data-location="${locationId}" data-flow="${flow}"></treatment-builder>
+    return `<treatment-builder data-tenant-id="${tenantId ?? 'YOUR_TENANT_ID'}" data-location="${locationId}" data-flow="${flow}"></treatment-builder>
 <script src="https://widget.treatmentbuilder.com/widget.js" defer></script>`;
   }
 
@@ -192,9 +195,9 @@ export default function EmbedCodePage() {
             </pre>
           </div>
           <p className="text-xs text-muted-foreground">
-            Your tenant slug:{' '}
+            Your tenant ID:{' '}
             <Badge variant="secondary" className="font-mono">
-              {slug}
+              {tenantId}
             </Badge>
           </p>
         </CardContent>

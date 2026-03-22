@@ -36,7 +36,7 @@ import type {
 import { BodySilhouette, FaceSilhouette } from './body-svg';
 
 interface Props {
-  slug: string;
+  tenantId: string;
   locationId?: string | null;
   widgetModeOverride?: WidgetMode | null;
 }
@@ -96,7 +96,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function WidgetPreviewClient({ slug, locationId: pinnedLocationId, widgetModeOverride }: Props) {
+export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, widgetModeOverride }: Props) {
   const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,7 +155,7 @@ export function WidgetPreviewClient({ slug, locationId: pinnedLocationId, widget
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/widget/config?slug=${slug}`, { signal });
+      const res = await fetch(`/api/widget/config?tenant_id=${tenantId}`, { signal });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error || `Error ${res.status}`);
@@ -180,7 +180,7 @@ export function WidgetPreviewClient({ slug, locationId: pinnedLocationId, widget
     loadConfig(controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [tenantId]);
 
   // ── Derived data ───────────────────────────────────────────────────
 
