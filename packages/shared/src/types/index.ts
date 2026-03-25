@@ -57,6 +57,8 @@ export type WidgetMode =
 
 export type DiagramType = 'face' | 'body' | 'full_body';
 
+export type WidgetLayout = 'split' | 'guided';
+
 export interface WidgetConfig {
   id: string;
   tenant_id: string;
@@ -75,6 +77,7 @@ export interface WidgetConfig {
   custom_css: string | null;
   widget_mode: WidgetMode;
   diagram_type: DiagramType;
+  widget_layout: WidgetLayout;
   created_at: string;
   updated_at: string;
 }
@@ -268,6 +271,7 @@ export interface WidgetConfigResponse {
   };
   widget_mode: WidgetMode;
   diagram_type: DiagramType;
+  widget_layout: WidgetLayout;
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];
   form_fields: WidgetFormField[];

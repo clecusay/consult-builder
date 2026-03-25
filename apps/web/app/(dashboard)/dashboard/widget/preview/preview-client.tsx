@@ -39,9 +39,10 @@ interface Props {
   tenantId: string;
   locationId?: string | null;
   widgetModeOverride?: WidgetMode | null;
+  widgetLayoutOverride?: 'split' | 'guided' | null;
 }
 
-type View = 'body' | 'form' | 'success';
+type View = 'body' | 'guided-concerns' | 'form' | 'success';
 
 // ── Step Indicator ──────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, widgetModeOverride }: Props) {
+export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, widgetModeOverride, widgetLayoutOverride }: Props) {
   const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,6 +188,8 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
   const widgetMode: WidgetMode = widgetModeOverride ?? config?.widget_mode ?? 'regions_concerns';
   const showConcerns = widgetMode.includes('concerns');
   const showServices = widgetMode.includes('services');
+  const widgetLayout = widgetLayoutOverride ?? (config as unknown as Record<string, unknown>)?.widget_layout as string ?? 'split';
+  const isGuided = widgetLayout === 'guided';
 
   // Regions for the selected gender
   const genderRegions = useMemo(() => {
@@ -417,7 +420,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
   const primaryColor = branding.primary_color || '#e84393';
 
   const totalSelections = selectedConcernIds.size + selectedServiceIds.size;
-  const currentStep = view === 'body' ? (selectedRegionSlugs.size > 0 ? 1 : 0) : 2;
+  const currentStep = view === 'form' ? 2 : view === 'guided-concerns' ? 1 : view === 'body' ? (selectedRegionSlugs.size > 0 ? 1 : 0) : 2;
 
   // ── Concern Button (shared between desktop panel and mobile sheet) ──
 
@@ -492,6 +495,99 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
           <span className="text-[10px] text-muted-foreground">
             Powered by Consult Builder
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Guided Concerns View ───────────────────────────────────────────
+  if (view === 'guided-concerns') {
+    return (
+      <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
+        <div className="px-4 py-3" style={{ backgroundColor: primaryColor, color: '#fff' }}>
+          <h2 className="text-base font-bold text-center">What are your concerns?</h2>
+          <p className="text-xs opacity-80 text-center mt-0.5">Select the concerns you&apos;d like to address</p>
+        </div>
+
+        <div className="pt-4">
+          <StepIndicator currentStep={1} primaryColor={primaryColor} />
+        </div>
+
+        <div className="px-4 py-4 space-y-1" style={{ maxHeight: 420, overflowY: 'auto' }}>
+          {showConcerns && selectedRegionSlugs.size > 0 && (
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+              <Input
+                value={concernSearchQuery}
+                onChange={(e) => setConcernSearchQuery(e.target.value)}
+                placeholder="Search concerns..."
+                className="text-xs pl-7 h-7"
+              />
+              {concernSearchQuery && (
+                <button type="button" onClick={() => setConcernSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {showConcerns && concernsByRegion.map((group) => {
+            const isExpanded = expandedRegions.has(group.regionSlug);
+            const selectedCount = getRegionConcernCount(group.regionSlug);
+            const popularIds = getPopularConcernIds(group.concerns);
+            const filteredConcerns = concernSearchQuery
+              ? group.concerns.filter((c) => c.name.toLowerCase().includes(concernSearchQuery.toLowerCase()))
+              : group.concerns;
+            if (concernSearchQuery && filteredConcerns.length === 0) return null;
+
+            return (
+              <div key={group.regionSlug}>
+                <div className="group flex items-center gap-2 py-2 cursor-pointer select-none" onClick={() => toggleRegionExpanded(group.regionSlug)}>
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex-1">{group.regionName}</h4>
+                  {selectedCount > 0 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{selectedCount} selected</Badge>}
+                </div>
+                <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="space-y-1 pb-2">
+                    {filteredConcerns.map((concern) => renderConcernButton(concern, popularIds))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {showServices && servicesByCategory.map((cat) => (
+            <div key={cat.id}>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">{cat.name}</h4>
+              <div className="space-y-1">
+                {cat.services.map((svc) => {
+                  const isSelected = selectedServiceIds.has(svc.id);
+                  return (
+                    <button key={svc.id} type="button" onClick={() => toggleService(svc.id)}
+                      className={`flex items-start gap-1.5 w-full rounded-md border px-2.5 py-1.5 text-left text-xs transition-all ${isSelected ? 'border-pink-200 bg-pink-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                      <div className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-pink-500 bg-pink-500' : 'border-slate-300'}`}>
+                        {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+                      </div>
+                      <span className={isSelected ? 'font-medium' : ''}>{svc.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between px-4 py-3 border-t">
+          <Button variant="ghost" size="sm" onClick={() => setView('body')}>
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+          <Button size="sm" style={{ backgroundColor: primaryColor }} className="text-white" onClick={() => setView('form')}>
+            Continue <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="border-t px-4 py-2 text-center">
+          <span className="text-[10px] text-muted-foreground">Powered by Consult Builder</span>
         </div>
       </div>
     );
@@ -629,7 +725,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
 
           {/* Nav */}
           <div className="flex items-center justify-between pt-1">
-            <Button variant="ghost" size="sm" onClick={() => setView('body')}>
+            <Button variant="ghost" size="sm" onClick={() => setView(isGuided ? 'guided-concerns' : 'body')}>
               <ChevronLeft className="h-4 w-4" />
               Back
             </Button>
@@ -653,7 +749,128 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
     );
   }
 
-  // ── Body Selection View (default) ─────────────────────────────────
+  // ── Guided Body View ──────────────────────────────────────────────
+  if (isGuided && view === 'body') {
+    return (
+      <div className="bg-white" style={{ fontFamily: branding.font_family || 'inherit' }}>
+        <div className="px-4 py-3" style={{ backgroundColor: primaryColor, color: '#fff' }}>
+          {config.tenant.logo_url && (
+            <img src={config.tenant.logo_url} alt={config.tenant.name} className="mx-auto mb-1.5 h-7 object-contain" />
+          )}
+          <h2 className="text-base font-bold text-center">
+            {branding.cta_text || 'Build Your Consultation Plan'}
+          </h2>
+          <p className="text-xs opacity-80 text-center mt-0.5">
+            Select the areas you&apos;d like to address
+          </p>
+        </div>
+
+        <div className="pt-4">
+          <StepIndicator currentStep={currentStep} primaryColor={primaryColor} />
+        </div>
+
+        <div className="flex flex-col items-center px-4 py-4">
+          {diagramView === 'face' && (
+            <button
+              type="button"
+              onClick={() => setDiagramView('body')}
+              className="flex items-center gap-1 self-start mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Back to Body
+            </button>
+          )}
+
+          <div className="relative w-full max-w-[240px] flex items-center justify-center">
+            {diagramView !== 'face' && (
+              <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
+                <button type="button" onClick={() => setBodySide('front')}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'front' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
+                  style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}>
+                  Front
+                </button>
+                <button type="button" onClick={() => setBodySide('back')}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'back' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
+                  style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}>
+                  Back
+                </button>
+              </div>
+            )}
+
+            {diagramView === 'body' ? (
+              <BodySilhouette
+                gender={gender}
+                bodySide={bodySide}
+                selectedRegionSlugs={selectedRegionSlugs}
+                activeRegionSlugs={activeRegionSlugs}
+                onAnchorClick={handleAnchorClick}
+                onFaceClick={() => setDiagramView('face')}
+                primaryColor={primaryColor}
+              />
+            ) : (
+              <FaceSilhouette
+                selectedRegionSlugs={selectedRegionSlugs}
+                activeRegionSlugs={activeRegionSlugs}
+                onAnchorClick={handleAnchorClick}
+                primaryColor={primaryColor}
+              />
+            )}
+          </div>
+
+          {/* Gender toggle */}
+          <div className="flex items-center gap-1 mt-2">
+            <button type="button" onClick={() => { setGender('female'); setDiagramView('body'); setBodySide('front'); setSelectedRegionSlugs(new Set()); setSelectedConcernIds(new Set()); }}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${gender === 'female' ? 'text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              style={gender === 'female' ? { backgroundColor: primaryColor } : undefined}>
+              Female
+            </button>
+            <button type="button" onClick={() => { setGender('male'); setDiagramView('body'); setBodySide('front'); setSelectedRegionSlugs(new Set()); setSelectedConcernIds(new Set()); }}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${gender === 'male' ? 'text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              style={gender === 'male' ? { backgroundColor: primaryColor } : undefined}>
+              Male
+            </button>
+          </div>
+
+          {/* Region chips */}
+          {selectedRegionSlugs.size > 0 && (
+            <div className="flex flex-wrap gap-2 justify-center mt-3">
+              {selectedRegions.map(r => (
+                <span key={r.slug} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border" style={{ backgroundColor: `color-mix(in srgb, ${primaryColor} 10%, transparent)`, color: primaryColor, borderColor: `color-mix(in srgb, ${primaryColor} 25%, transparent)` }}>
+                  {r.name}
+                  <button type="button" onClick={() => handleRemoveRegionBySlug(r.slug)} className="opacity-60 hover:opacity-100">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Continue */}
+          <div className="flex items-center justify-between w-full mt-4 max-w-sm">
+            <div />
+            <Button
+              size="sm"
+              style={{ backgroundColor: primaryColor }}
+              className="text-white"
+              disabled={selectedRegionSlugs.size === 0}
+              onClick={() => setView('guided-concerns')}
+            >
+              Continue <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t px-4 py-1.5 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">Powered by Consult Builder</span>
+          <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { reset(); loadConfig(); }}>
+            <RefreshCw className="h-2.5 w-2.5" /> Reset
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Split Body Selection View (default) ─────────────────────────────────
 
   return (
     <TooltipProvider>
@@ -977,7 +1194,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
                     className="text-white h-7 text-xs"
                     size="sm"
                     style={{ backgroundColor: primaryColor }}
-                    onClick={() => setView('form')}
+                    onClick={() => setView(isGuided ? 'guided-concerns' : 'form')}
                   >
                     Continue
                     <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
@@ -999,7 +1216,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
                 className="text-white h-7 text-xs"
                 size="sm"
                 style={{ backgroundColor: primaryColor }}
-                onClick={() => setView('form')}
+                onClick={() => setView(isGuided ? 'guided-concerns' : 'form')}
               >
                 Continue
                 <ChevronRight className="h-3.5 w-3.5 ml-0.5" />

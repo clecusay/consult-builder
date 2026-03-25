@@ -19,7 +19,7 @@ import { html, raw, SafeHTML } from './template';
 import { ICONS } from './icons';
 import { renderBodySVG, renderFaceSVG } from './svg-renderer';
 
-type View = 'body' | 'form' | 'success';
+type View = 'body' | 'guided-concerns' | 'form' | 'success';
 
 class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
@@ -88,6 +88,15 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private get widgetMode(): WidgetMode {
     return this.config?.widget_mode || 'regions_concerns';
+  }
+
+  private get widgetLayout(): 'split' | 'guided' {
+    if (!this.config) return 'split';
+    return (this.config as unknown as Record<string, unknown>).widget_layout as 'split' | 'guided' || 'split';
+  }
+
+  private get isGuided(): boolean {
+    return this.widgetLayout === 'guided';
   }
 
   private get showConcerns(): boolean {
@@ -159,6 +168,8 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   private get currentStep(): number {
+    if (this.view === 'form') return 2;
+    if (this.view === 'guided-concerns') return 1;
     if (this.view !== 'body') return 2;
     return this.selectedRegionSlugs.size > 0 ? 1 : 0;
   }
@@ -260,6 +271,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     let content: SafeHTML;
     if (this.view === 'success') content = this.renderSuccess();
     else if (this.view === 'form') content = this.renderForm();
+    else if (this.view === 'guided-concerns') content = this.renderGuidedConcerns();
     else content = this.renderBodyView();
 
     this.shadow.innerHTML = html`${style}${content}`.value;
@@ -295,6 +307,11 @@ class TreatmentBuilderWidget extends HTMLElement {
   // ── Body Diagram View ──
 
   private renderBodyView(): SafeHTML {
+    if (this.isGuided) return this.renderGuidedBody();
+    return this.renderSplitBody();
+  }
+
+  private renderSplitBody(): SafeHTML {
     const cfg = this.config!;
     const pc = this.primaryColor;
 
@@ -339,6 +356,69 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           <div class="tb-panel-col">
             ${this.renderPanel()}
+          </div>
+        </div>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  // ── Guided Layout: Body Step ──
+
+  private renderGuidedBody(): SafeHTML {
+    const cfg = this.config!;
+    const pc = this.primaryColor;
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>${cfg.branding.cta_text || 'Build Your Consultation Plan'}</h2>
+          <p>Select the areas you'd like to address</p>
+        </div>
+
+        ${this.renderStepIndicator()}
+
+        <div class="tb-guided-body">
+          ${this.diagramView === 'face' && !this.isFaceOnly
+            ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
+            : false}
+
+          <div class="tb-guided-diagram">
+            ${this.diagramView === 'body' ? html`
+              <div class="tb-side-toggle">
+                <button class="tb-side-btn${this.bodySide === 'front' ? ' active' : ''}" data-side="front">${raw(ICONS.personFront)} Front</button>
+                <button class="tb-side-btn${this.bodySide === 'back' ? ' active' : ''}" data-side="back">${raw(ICONS.personBack)} Back</button>
+              </div>
+            ` : false}
+
+            ${this.diagramView === 'body'
+              ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
+              : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+          </div>
+
+          <div class="tb-gender">
+            <button class="tb-gender-btn${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female">Female</button>
+            <button class="tb-gender-btn${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male">Male</button>
+          </div>
+
+          ${this.selectedRegionSlugs.size > 0 ? html`
+            <div class="tb-guided-chips">
+              ${this.selectedRegions.map(r => html`
+                <span class="tb-chip">
+                  ${r.name}
+                  <button class="tb-chip-x" data-remove-region="${r.slug}">${raw(ICONS.x)}</button>
+                </span>
+              `)}
+            </div>
+          ` : false}
+
+          <div class="tb-guided-nav">
+            <div></div>
+            <button class="tb-continue-btn${this.selectedRegionSlugs.size === 0 ? ' disabled' : ''}" data-action="guided-to-concerns" ${this.selectedRegionSlugs.size === 0 ? raw('disabled') : false}>
+              Continue ${raw(ICONS.chevronRight)}
+            </button>
           </div>
         </div>
 
@@ -452,6 +532,104 @@ class TreatmentBuilderWidget extends HTMLElement {
         <span class="${sel ? 'tb-item-name selected' : 'tb-item-name'}">${concern.name}</span>
         ${isPopular ? html`<span class="tb-popular">Popular</span>` : false}
       </button>
+    `;
+  }
+
+  // ── Guided Layout: Concerns/Services Step ──
+
+  private renderGuidedConcerns(): SafeHTML {
+    const cfg = this.config!;
+    const query = this.concernSearchQuery.toLowerCase();
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>What are your concerns?</h2>
+          <p>Select the concerns you'd like to address</p>
+        </div>
+
+        ${this.renderStepIndicator()}
+
+        <div class="tb-guided-concerns">
+          ${this.showConcerns ? html`
+            <div class="tb-search">
+              <span class="tb-search-icon">${raw(ICONS.search)}</span>
+              <input type="text" placeholder="Search concerns..." value="${this.concernSearchQuery}" data-action="search"/>
+              ${this.concernSearchQuery ? html`<button class="tb-search-clear" data-action="clear-search">${raw(ICONS.x)}</button>` : false}
+            </div>
+          ` : false}
+
+          <div class="tb-guided-list">
+            ${this.showConcerns ? (() => {
+              const hasQuery = !!query;
+              let anyVisible = false;
+              const groups = this.concernsByRegion.map(group => {
+                const isExpanded = this.expandedRegions.has(group.regionSlug);
+                const count = this.getRegionConcernCount(group.regionSlug);
+                const popularIds = this.getPopularIds(group.concerns);
+                const filtered = hasQuery
+                  ? group.concerns.filter(c => c.name.toLowerCase().includes(query))
+                  : group.concerns;
+                if (hasQuery && filtered.length === 0) return false;
+                anyVisible = true;
+
+                return html`
+                  <div>
+                    <div class="tb-region-header" data-toggle-region="${group.regionSlug}">
+                      <span class="tb-region-chevron ${isExpanded ? 'expanded' : 'collapsed'}">${raw(ICONS.chevronDown)}</span>
+                      <span class="tb-region-name">${group.regionName}</span>
+                      ${count > 0 ? html`<span class="tb-region-badge">${count} selected</span>` : false}
+                    </div>
+                    <div class="tb-region-concerns ${isExpanded ? 'expanded' : 'collapsed'}">
+                      <div class="tb-concern-list">
+                        ${filtered.map(c => this.renderConcernBtn(c, popularIds))}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              });
+              return html`
+                ${groups}
+                ${this.concernsByRegion.length === 0
+                  ? html`<p style="padding:16px 0;text-align:center;font-size:11px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+                  : false}
+                ${hasQuery && !anyVisible
+                  ? html`<p style="padding:24px 0;text-align:center;font-size:12px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+                  : false}
+              `;
+            })() : false}
+
+            ${this.showServices && this.config
+              ? this.filteredServiceCategories
+                  .filter(cat => cat.services.length > 0)
+                  .map(cat => html`
+                    <div class="tb-svc-cat">
+                      <div class="tb-svc-cat-title">${cat.name}</div>
+                      <div style="display:flex;flex-direction:column;gap:4px">
+                        ${cat.services.map(svc => {
+                          const sel = this.selectedServiceIds.has(svc.id);
+                          return html`
+                            <button class="tb-item-btn${sel ? ' selected' : ''}" data-service-id="${svc.id}">
+                              <span class="tb-item-check ${sel ? 'on' : 'off'}">${sel ? raw(ICONS.check) : false}</span>
+                              <span class="${sel ? 'tb-item-name selected' : 'tb-item-name'}">${svc.name}${svc.description ? html`<span class="tb-svc-desc">${svc.description}</span>` : false}</span>
+                            </button>
+                          `;
+                        })}
+                      </div>
+                    </div>
+                  `)
+              : false}
+          </div>
+
+          <div class="tb-guided-nav">
+            <button class="tb-back-btn" data-action="guided-back-to-body">${raw(ICONS.chevronLeft)} Back</button>
+            <button class="tb-continue-btn" data-action="continue">Continue ${raw(ICONS.chevronRight)}</button>
+          </div>
+        </div>
+
+        ${this.renderFooter()}
+      </div>
     `;
   }
 
@@ -611,7 +789,14 @@ class TreatmentBuilderWidget extends HTMLElement {
         // Actions
         const action = el.getAttribute('data-action');
         if (action === 'continue') { this.view = 'form'; this.render(); return; }
-        if (action === 'back-to-body') { this.view = 'body'; this.formError = ''; this.render(); return; }
+        if (action === 'guided-to-concerns') { this.view = 'guided-concerns'; this.render(); return; }
+        if (action === 'guided-back-to-body') { this.view = 'body'; this.render(); return; }
+        if (action === 'back-to-body') {
+          if (this.isGuided) { this.view = 'guided-concerns'; } else { this.view = 'body'; }
+          this.formError = '';
+          this.render();
+          return;
+        }
         if (action === 'back-to-body-diagram') { this.diagramView = 'body'; this.render(); return; }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }

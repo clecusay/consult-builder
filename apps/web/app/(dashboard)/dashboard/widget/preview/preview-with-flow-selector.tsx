@@ -51,36 +51,71 @@ interface Props {
 
 export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedFlow, setSelectedFlow] = useState<WidgetMode>('regions_concerns');
+  const [selectedLayout, setSelectedLayout] = useState<'split' | 'guided'>('split');
 
   const selectedOption = FLOW_OPTIONS.find((o) => o.mode === selectedFlow)!;
 
   return (
     <div className="space-y-4">
-      {/* Flow Selector Card */}
+      {/* Flow & Layout Selector Card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Widget Flow</CardTitle>
+          <CardTitle className="text-base">Widget Flow & Layout</CardTitle>
           <CardDescription>
-            Preview how visitors interact with your widget in different modes
+            Preview how visitors interact with your widget in different modes and layouts
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {FLOW_OPTIONS.map((opt) => (
+        <CardContent className="space-y-4">
+          {/* Flow selector */}
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">Flow Mode</p>
+            <div className="flex flex-wrap gap-2">
+              {FLOW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.mode}
+                  type="button"
+                  onClick={() => setSelectedFlow(opt.mode)}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                    selectedFlow === opt.mode
+                      ? 'bg-indigo-500 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Layout selector */}
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">Layout</p>
+            <div className="flex gap-2">
               <button
-                key={opt.mode}
                 type="button"
-                onClick={() => setSelectedFlow(opt.mode)}
+                onClick={() => setSelectedLayout('split')}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  selectedFlow === opt.mode
+                  selectedLayout === 'split'
                     ? 'bg-indigo-500 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {opt.label}
+                Split View
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setSelectedLayout('guided')}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  selectedLayout === 'guided'
+                    ? 'bg-indigo-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Guided Flow
+              </button>
+            </div>
           </div>
+
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <p className="text-sm text-muted-foreground">{selectedOption.description}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -119,7 +154,7 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
         </div>
 
         {/* Live Preview */}
-        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} />
+        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} widgetLayoutOverride={selectedLayout} />
       </Card>
     </div>
   );

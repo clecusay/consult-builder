@@ -352,6 +352,7 @@ export async function GET(request: Request) {
     },
     widget_mode: config.widget_mode || 'regions_concerns',
     diagram_type: config.diagram_type || 'full_body',
+    widget_layout: config.widget_layout || 'split',
     regions,
     service_categories: serviceCategories,
     form_fields: (formFields && formFields.length > 0) ? deduplicateFormFields(formFields) : DEFAULT_FORM_FIELDS,

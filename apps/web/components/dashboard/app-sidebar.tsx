@@ -19,6 +19,7 @@ import {
   ScrollText,
   Building2,
   Stethoscope,
+  LayoutTemplate,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -53,6 +54,7 @@ export function AppSidebar({ role, tenantName }: AppSidebarProps) {
     { title: 'Branding', href: '/dashboard/widget/branding', icon: Palette },
     { title: 'Services', href: '/dashboard/widget/services', icon: Stethoscope },
     { title: 'Regions', href: '/dashboard/widget/regions', icon: Layers },
+    { title: 'Layout', href: '/dashboard/widget/layout', icon: LayoutTemplate },
     { title: 'Form Fields', href: '/dashboard/widget/form', icon: FormInput },
     { title: 'Integration', href: '/dashboard/widget/integration', icon: Webhook },
     { title: 'Preview', href: '/dashboard/widget/preview', icon: Eye },
