@@ -335,13 +335,18 @@ export default function ServicesPage() {
     setSaved(false);
 
     // Delete existing services (cascades to service_body_regions)
-    await supabase.from('services').delete().eq('tenant_id', tenantId);
+    const { error: delServicesErr } = await supabase.from('services').delete().eq('tenant_id', tenantId);
+    if (delServicesErr) console.error('[services:save] delete services failed:', delServicesErr);
+
     // Delete existing tenant-specific service categories
-    await supabase.from('service_categories').delete().eq('tenant_id', tenantId);
+    const { error: delCatsErr } = await supabase.from('service_categories').delete().eq('tenant_id', tenantId);
+    if (delCatsErr) console.error('[services:save] delete categories failed:', delCatsErr);
 
     const enabledTreatments = TREATMENT_LIBRARY.filter((t) =>
       enabled.has(t.name.toLowerCase()),
     );
+
+    console.log('[services:save] enabled treatments:', enabledTreatments.length);
 
     if (enabledTreatments.length === 0) {
       setSaving(false);
@@ -360,10 +365,13 @@ export default function ServicesPage() {
       is_active: true,
     }));
 
-    const { data: insertedCats } = await supabase
+    const { data: insertedCats, error: insertCatsErr } = await supabase
       .from('service_categories')
       .insert(catRows)
       .select('id, name');
+
+    if (insertCatsErr) console.error('[services:save] insert categories failed:', insertCatsErr);
+    console.log('[services:save] inserted categories:', insertedCats?.length ?? 0);
 
     const categoryLookup = new Map<string, string>();
     for (const cat of insertedCats || []) {
@@ -381,19 +389,25 @@ export default function ServicesPage() {
       display_order: i + 1,
     }));
 
-    const { data: insertedServices } = await supabase
+    const { data: insertedServices, error: insertServicesErr } = await supabase
       .from('services')
       .insert(serviceRows)
       .select('id, name, category_id');
 
+    if (insertServicesErr) console.error('[services:save] insert services failed:', insertServicesErr);
+    console.log('[services:save] inserted services:', insertedServices?.length ?? 0);
+
     // Populate service_body_regions so the widget filters regions correctly
     if (insertedServices && insertedServices.length > 0) {
       // Fetch all body regions (platform defaults + tenant-specific)
-      const { data: bodyRegions } = await supabase
+      const { data: bodyRegions, error: regionsErr } = await supabase
         .from('body_regions')
         .select('id, slug, body_area')
         .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
         .eq('is_active', true);
+
+      if (regionsErr) console.error('[services:save] fetch body_regions failed:', regionsErr);
+      console.log('[services:save] body regions found:', bodyRegions?.length ?? 0);
 
       if (bodyRegions && bodyRegions.length > 0) {
         // Build category_id → target keys mapping
@@ -435,12 +449,15 @@ export default function ServicesPage() {
           }
         }
 
+        console.log('[services:save] service_body_region links to insert:', links.length);
         if (links.length > 0) {
-          await supabase.from('service_body_regions').insert(links);
+          const { error: linksErr } = await supabase.from('service_body_regions').insert(links);
+          if (linksErr) console.error('[services:save] insert service_body_regions failed:', linksErr);
         }
       }
     }
 
+    console.log('[services:save] complete');
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

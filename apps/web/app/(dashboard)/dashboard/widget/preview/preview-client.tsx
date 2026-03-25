@@ -64,16 +64,16 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
               <div
                 className="flex items-center justify-center rounded-full transition-all duration-200"
                 style={{
-                  width: isActive ? 24 : 18,
-                  height: isActive ? 24 : 18,
+                  width: isActive ? 30 : 24,
+                  height: isActive ? 30 : 24,
                   backgroundColor: isActive || isCompleted ? primaryColor : '#e2e8f0',
                 }}
               >
                 {isCompleted ? (
-                  <Check className="h-2.5 w-2.5 text-white" />
+                  <Check className="h-3.5 w-3.5 text-white" />
                 ) : (
                   <span
-                    className="text-[9px] font-bold"
+                    className="text-[11px] font-bold"
                     style={{ color: isActive ? 'white' : '#94a3b8' }}
                   >
                     {i + 1}
@@ -81,7 +81,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
                 )}
               </div>
               <span
-                className="text-[8px] font-medium whitespace-nowrap"
+                className="text-[11px] font-medium whitespace-nowrap"
                 style={{ color: isActive ? primaryColor : '#94a3b8' }}
               >
                 {label}
@@ -229,10 +229,23 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
   // Services from selected regions (if mode includes services)
   const servicesByCategory = useMemo(() => {
     if (!config) return [];
+    const selectedRegionIds = new Set(
+      config.regions
+        .filter((r) => selectedRegionSlugs.has(r.slug))
+        .map((r) => r.id)
+    );
     return config.service_categories
+      .map((cat) => ({
+        ...cat,
+        services: cat.services.filter(
+          (svc) =>
+            svc.region_ids.length === 0 ||
+            svc.region_ids.some((rid) => selectedRegionIds.has(rid))
+        ),
+      }))
       .filter((cat) => cat.services.length > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [config]);
+  }, [config, selectedRegionSlugs]);
 
   // Auto-expand newly selected regions
   useEffect(() => {
@@ -500,9 +513,11 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
           </p>
         </div>
 
-        <StepIndicator currentStep={2} primaryColor={primaryColor} />
+        <div className="pt-4">
+          <StepIndicator currentStep={2} primaryColor={primaryColor} />
+        </div>
 
-        <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
+        <div className="px-4 py-8 max-w-lg mx-auto space-y-3">
           {/* Standard fields */}
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-0.5">
@@ -523,10 +538,10 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
             </div>
           </div>
 
-          {/* Custom form fields */}
-          {config.form_fields.length > 0 && (
+          {/* Custom form fields (exclude system + opt-in fields rendered elsewhere) */}
+          {config.form_fields.filter(f => !['first_name','last_name','email','phone','sms_opt_in','email_opt_in'].includes(f.field_key ?? '')).length > 0 && (
             <div className="grid gap-2 sm:grid-cols-2">
-              {config.form_fields.map((field) => (
+              {config.form_fields.filter(f => !['first_name','last_name','email','phone','sms_opt_in','email_opt_in'].includes(f.field_key ?? '')).map((field) => (
                 <div key={field.id} className="space-y-0.5">
                   <label className="text-xs font-medium">
                     {field.label}

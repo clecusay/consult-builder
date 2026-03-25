@@ -168,9 +168,13 @@ export default function FormFieldsPage() {
       const customOnly: CustomField[] = [];
       const savedServiceNames = new Set<string>();
 
+      // Labels that correspond to system fields (catches old rows without field_key)
+      const SYSTEM_LABELS = new Set(['first name', 'last name', 'email', 'sms opt-in', 'email opt-in']);
+
       for (const f of allFields) {
-        // Skip system fields (first_name, last_name, email, opt-ins) — always present
+        // Skip system fields by field_key or by label fallback
         if (f.field_key && SYSTEM_FIELD_KEYS.has(f.field_key)) continue;
+        if (!f.field_key && SYSTEM_LABELS.has(f.label.toLowerCase())) continue;
 
         // Detect presets by field_key (reliable) or fallback to label matching
         if (f.field_key === 'phone' || (f.label === 'Phone Number' && f.field_type === 'phone')) {

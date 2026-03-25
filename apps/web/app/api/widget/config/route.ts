@@ -4,6 +4,20 @@ import type { WidgetConfigResponse, WidgetRegion, WidgetConcern } from '@treatme
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Remove duplicate form fields — keeps the row with a field_key over one without. */
+function deduplicateFormFields<T extends { field_key: string | null; label: string }>(fields: T[]): T[] {
+  const seen = new Map<string, T>();
+  for (const f of fields) {
+    const key = f.field_key || f.label.toLowerCase();
+    const existing = seen.get(key);
+    // Prefer the version that has a proper field_key
+    if (!existing || (f.field_key && !existing.field_key)) {
+      seen.set(key, f);
+    }
+  }
+  return [...seen.values()];
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tenantId = searchParams.get('tenant_id');
@@ -340,7 +354,7 @@ export async function GET(request: Request) {
     diagram_type: config.diagram_type || 'full_body',
     regions,
     service_categories: serviceCategories,
-    form_fields: (formFields && formFields.length > 0) ? formFields : DEFAULT_FORM_FIELDS,
+    form_fields: (formFields && formFields.length > 0) ? deduplicateFormFields(formFields) : DEFAULT_FORM_FIELDS,
     locations: (tenantLocations || []).map(loc => ({ id: loc.id, name: loc.name, is_primary: loc.is_primary, city: loc.city, state: loc.state })),
   };
 
