@@ -171,6 +171,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     if (this.view === 'form') return 2;
     if (this.view === 'guided-concerns') return 1;
     if (this.view !== 'body') return 2;
+    if (this.isGuided) return 0;
     return this.selectedRegionSlugs.size > 0 ? 1 : 0;
   }
 

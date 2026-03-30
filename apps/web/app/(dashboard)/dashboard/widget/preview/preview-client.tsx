@@ -420,7 +420,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
   const primaryColor = branding.primary_color || '#e84393';
 
   const totalSelections = selectedConcernIds.size + selectedServiceIds.size;
-  const currentStep = view === 'form' ? 2 : view === 'guided-concerns' ? 1 : view === 'body' ? (selectedRegionSlugs.size > 0 ? 1 : 0) : 2;
+  const currentStep = view === 'form' ? 2 : view === 'guided-concerns' ? 1 : view === 'body' ? (isGuided ? 0 : (selectedRegionSlugs.size > 0 ? 1 : 0)) : 2;
 
   // ── Concern Button (shared between desktop panel and mobile sheet) ──
 
