@@ -480,7 +480,7 @@ class TreatmentBuilderWidget extends HTMLElement {
               <div class="tb-diagram-wrap">
                 ${this.diagramView === 'body'
                   ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
-                  : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+                  : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
               </div>
 
               ${this.diagramView === 'body' ? html`
@@ -537,7 +537,7 @@ class TreatmentBuilderWidget extends HTMLElement {
             <div class="tb-guided-diagram">
               ${this.diagramView === 'body'
                 ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
-                : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+                : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
             </div>
 
             ${this.diagramView === 'body' ? html`
@@ -1195,10 +1195,8 @@ class TreatmentBuilderWidget extends HTMLElement {
             const slugs = anchor.getAttribute('data-anchor-slugs');
             if (slugs) {
               const slugArr = slugs.split(',');
-              // Face anchor: drill down to face view
+              // Face anchor: drill down to face view without selecting
               if (this.diagramView === 'body' && slugArr.some(s => ['upper-face', 'midface', 'lips', 'lower-face'].includes(s))) {
-                for (const s of slugArr) this.selectedRegionSlugs.add(s);
-                for (const s of slugArr) this.expandedRegions.add(s);
                 this.diagramView = 'face';
                 this.render();
                 return;

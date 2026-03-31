@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,34 +8,23 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ArrowRight } from 'lucide-react';
+import Script from 'next/script';
 import type { WidgetMode, RegionStyle } from '@treatment-builder/shared';
-import { WidgetPreviewClient } from './preview-client';
 
-const FLOW_OPTIONS: {
-  mode: WidgetMode;
-  label: string;
-  description: string;
-  steps: string[];
-}[] = [
-  {
-    mode: 'regions_services',
-    label: 'Direct Services',
-    description: 'Body regions → services → form. Ideal for practices focused on specific procedures.',
-    steps: ['Body Region', 'Services', 'Form'],
-  },
-  {
-    mode: 'regions_concerns',
-    label: 'Concerns Focus',
-    description: 'Body regions → concerns → form. Great for general consultation lead capture.',
-    steps: ['Body Region', 'Concerns', 'Form'],
-  },
-  {
-    mode: 'treatment_builder',
-    label: 'Treatment Builder',
-    description: 'Guided consultative experience — pain points, outcomes, barriers, then lead capture.',
-    steps: ['Body Area', 'Pain Points', 'Outcomes', 'Barriers', 'Bridge', 'Lead Capture'],
-  },
+const FLOW_OPTIONS: { mode: WidgetMode; label: string }[] = [
+  { mode: 'regions_services', label: 'Direct Services' },
+  { mode: 'regions_concerns', label: 'Concerns Focus' },
+  { mode: 'treatment_builder', label: 'Treatment Builder' },
+];
+
+const LAYOUT_OPTIONS: { value: 'split' | 'guided'; label: string }[] = [
+  { value: 'split', label: 'Split View' },
+  { value: 'guided', label: 'Guided Flow' },
+];
+
+const REGION_STYLE_OPTIONS: { value: RegionStyle; label: string }[] = [
+  { value: 'diagram', label: 'Body Diagram' },
+  { value: 'cards', label: 'Card Grid' },
 ];
 
 interface Props {
@@ -47,8 +36,39 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedFlow, setSelectedFlow] = useState<WidgetMode>('regions_concerns');
   const [selectedLayout, setSelectedLayout] = useState<'split' | 'guided'>('split');
   const [selectedRegionStyle, setSelectedRegionStyle] = useState<RegionStyle>('diagram');
+  const [widgetKey, setWidgetKey] = useState(0);
+  const [ceReady, setCeReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = FLOW_OPTIONS.find((o) => o.mode === selectedFlow)!;
+  // Wait for the custom element to be defined
+  useEffect(() => {
+    if (customElements.get('treatment-builder')) {
+      setCeReady(true);
+      return;
+    }
+    customElements.whenDefined('treatment-builder').then(() => setCeReady(true));
+  }, []);
+
+  // Re-mount the widget when options change
+  useEffect(() => {
+    setWidgetKey((k) => k + 1);
+  }, [selectedFlow, selectedLayout, selectedRegionStyle]);
+
+  // Inject the widget element once CE is defined
+  useEffect(() => {
+    if (!ceReady) return;
+    const container = containerRef.current;
+    if (!container) return;
+    container.innerHTML = '';
+    const el = document.createElement('treatment-builder');
+    el.setAttribute('data-tenant-id', tenantId);
+    el.setAttribute('data-flow', selectedFlow);
+    el.setAttribute('data-layout', selectedLayout);
+    container.appendChild(el);
+  }, [widgetKey, ceReady, tenantId, selectedFlow, selectedLayout]);
+
+  const selectClass =
+    'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400';
 
   return (
     <div className="space-y-4">
@@ -60,99 +80,51 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
             Preview how visitors interact with your widget in different modes and layouts
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Flow selector */}
-          <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">Flow Mode</p>
-            <div className="flex flex-wrap gap-2">
-              {FLOW_OPTIONS.map((opt) => (
-                <button
-                  key={opt.mode}
-                  type="button"
-                  onClick={() => setSelectedFlow(opt.mode)}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                    selectedFlow === opt.mode
-                      ? 'bg-indigo-500 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Flow Mode</label>
+              <select
+                value={selectedFlow}
+                onChange={(e) => setSelectedFlow(e.target.value as WidgetMode)}
+                className={selectClass}
+              >
+                {FLOW_OPTIONS.map((opt) => (
+                  <option key={opt.mode} value={opt.mode}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Layout selector */}
-          <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">Layout</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedLayout('split')}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  selectedLayout === 'split'
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Layout</label>
+              <select
+                value={selectedLayout}
+                onChange={(e) => setSelectedLayout(e.target.value as 'split' | 'guided')}
+                className={selectClass}
               >
-                Split View
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedLayout('guided')}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  selectedLayout === 'guided'
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Guided Flow
-              </button>
+                {LAYOUT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Region style selector */}
-          <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">Body Area Selection</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedRegionStyle('diagram')}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  selectedRegionStyle === 'diagram'
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Body Area Selection</label>
+              <select
+                value={selectedRegionStyle}
+                onChange={(e) => setSelectedRegionStyle(e.target.value as RegionStyle)}
+                className={selectClass}
               >
-                Body Diagram
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRegionStyle('cards')}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                  selectedRegionStyle === 'cards'
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Card Grid
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-md bg-slate-50 px-3 py-2">
-            <p className="text-sm text-muted-foreground">{selectedOption.description}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {selectedOption.steps.map((step, index) => (
-                <span key={step} className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                    {step}
-                  </span>
-                  {index < selectedOption.steps.length - 1 && (
-                    <ArrowRight className="h-3 w-3 text-indigo-400" />
-                  )}
-                </span>
-              ))}
+                {REGION_STYLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </CardContent>
@@ -177,9 +149,15 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
           </div>
         </div>
 
-        {/* Live Preview */}
-        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} widgetLayoutOverride={selectedLayout} regionStyleOverride={selectedRegionStyle} />
+        {/* Live Widget Preview */}
+        <div
+          key={widgetKey}
+          ref={containerRef}
+          className="min-h-[500px] bg-white"
+        />
       </Card>
+
+      <Script src="/widget.js" strategy="afterInteractive" />
     </div>
   );
 }
