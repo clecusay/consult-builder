@@ -580,7 +580,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
         </div>
         <div className="border-t px-4 py-2 text-center">
           <span className="text-[10px] text-muted-foreground">
-            Powered by Consult Builder
+            Powered by Consult Intake
           </span>
         </div>
       </div>
@@ -674,7 +674,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
         </div>
 
         <div className="border-t px-4 py-2 text-center">
-          <span className="text-[10px] text-muted-foreground">Powered by Consult Builder</span>
+          <span className="text-[10px] text-muted-foreground">Powered by Consult Intake</span>
         </div>
       </div>
     );
@@ -829,7 +829,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
 
         <div className="border-t px-4 py-2 text-center">
           <span className="text-[10px] text-muted-foreground">
-            Powered by Consult Builder
+            Powered by Consult Intake
           </span>
         </div>
       </div>
@@ -954,7 +954,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
         </div>
 
         <div className="border-t px-4 py-1.5 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">Powered by Consult Builder</span>
+          <span className="text-[10px] text-muted-foreground">Powered by Consult Intake</span>
           <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { reset(); loadConfig(); }}>
             <RefreshCw className="h-2.5 w-2.5" /> Reset
           </Button>
@@ -1348,7 +1348,7 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
         {/* Footer */}
         <div className="border-t px-4 py-1.5 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">
-            Powered by Consult Builder
+            Powered by Consult Intake
           </span>
           <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { reset(); loadConfig(); }}>
             <RefreshCw className="h-2.5 w-2.5" />

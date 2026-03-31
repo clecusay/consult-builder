@@ -96,7 +96,7 @@ export function AppSidebar({ role, tenantName }: AppSidebarProps) {
             CB
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-white">Consult Builder</span>
+            <span className="text-sm font-semibold text-white">Consult Intake</span>
             <span className="text-xs text-slate-400 truncate max-w-[150px]">
               {tenantName}
             </span>

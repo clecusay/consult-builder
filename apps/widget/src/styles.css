@@ -147,7 +147,7 @@
 .tb-split {
   display: flex;
   flex-direction: row;
-  min-height: 460px;
+  min-height: 340px;
   max-height: min(560px, 65vh);
   flex: 1;
 }
@@ -157,7 +157,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 10px;
   border-right: 1px solid #f1f5f9;
   overflow-y: auto;
@@ -179,11 +179,15 @@
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 
 .tb-diagram-wrap svg {
-  width: 100%;
-  height: auto;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .tb-back-to-body {
@@ -210,51 +214,48 @@
 
 /* --- Front/Back Toggle --- */
 
-.tb-side-toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 10;
+.tb-diagram-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
-.tb-side-btn {
+.tb-rotate-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   border: 1px solid #e2e8f0;
   background: #fff;
-  color: #94a3b8;
-  font-family: inherit;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  margin-top: 25%;
 }
 
-.tb-side-btn:hover {
+.tb-rotate-btn:hover {
   border-color: #cbd5e1;
-  color: #475569;
+  color: #334155;
   background: #f8fafc;
 }
 
-.tb-side-btn.active {
-  background: var(--tb-primary, #e84393);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--tb-primary, #e84393) 30%, transparent);
+.tb-rotate-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
-.tb-side-btn svg {
-  width: 14px;
-  height: 14px;
+.tb-rotate-spacer {
+  width: 40px;
+  flex-shrink: 0;
 }
+
 
 /* --- Gender Toggle --- */
 
@@ -319,6 +320,18 @@
   width: 28px;
   height: 28px;
   color: #94a3b8;
+}
+
+.tb-panel-empty-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.tb-panel-empty-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 4px;
 }
 
 /* --- Panel: Content --- */
@@ -967,14 +980,7 @@
 
 /* --- SVG Animations --- */
 
-@keyframes tb-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.tb-anchor-pulse {
-  animation: tb-pulse 2s ease-in-out infinite;
-}
+/* Anchor pulse uses inline SVG <animate> — no CSS needed */
 
 /* --- Guided Layout --- */
 

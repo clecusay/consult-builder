@@ -107,7 +107,7 @@ const PRICING_TIER = {
 
 const FAQ_ITEMS = [
   {
-    q: 'How does Consult Builder work?',
+    q: 'How does Consult Intake work?',
     a: 'Patients interact with a visual body diagram on your website, selecting the areas they want to address and their specific concerns. This pre-qualifies them before they ever speak with your team — so every consultation starts informed.',
   },
   {
@@ -157,7 +157,7 @@ export default function Home() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white text-xs font-bold">
               CB
             </div>
-            <span className="text-base font-semibold text-slate-900">Consult Builder</span>
+            <span className="text-base font-semibold text-slate-900">Consult Intake</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
@@ -348,7 +348,7 @@ export default function Home() {
               <span className="text-indigo-400">&lt;script</span>{' '}
               <span className="text-green-400">src</span>
               <span className="text-slate-400">=</span>
-              <span className="text-amber-300">&quot;https://cdn.consultbuilder.com/widget.js&quot;</span>
+              <span className="text-amber-300">&quot;https://cdn.consultintake.com/widget.js&quot;</span>
               <br />
               {'  '}
               <span className="text-green-400">data-slug</span>
@@ -400,7 +400,7 @@ export default function Home() {
       <section className="bg-slate-950 py-20 sm:py-28 px-6">
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 mb-8">
-            <span className="text-xs font-semibold text-indigo-400">Why Consult Builder</span>
+            <span className="text-xs font-semibold text-indigo-400">Why Consult Intake</span>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
             Stop collecting forms.{' '}
@@ -408,7 +408,7 @@ export default function Home() {
           </h2>
           <p className="mt-8 text-base leading-relaxed text-slate-400 max-w-2xl mx-auto">
             Traditional intake forms are blind. They capture a name and email but tell
-            your team nothing about what the patient actually wants. Consult Builder
+            your team nothing about what the patient actually wants. Consult Intake
             changes that. Every submission arrives with the patient&apos;s selected body
             areas, specific concerns, and treatment interests — so your consultants can
             have informed, productive conversations from the very first call.
@@ -611,7 +611,7 @@ export default function Home() {
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white text-[10px] font-bold">
                 CB
               </div>
-              <span className="text-sm font-semibold text-slate-700">Consult Builder</span>
+              <span className="text-sm font-semibold text-slate-700">Consult Intake</span>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-6">
@@ -633,7 +633,7 @@ export default function Home() {
             </div>
 
             <p className="text-xs text-slate-400">
-              &copy; {new Date().getFullYear()} Consult Builder. All rights reserved.
+              &copy; {new Date().getFullYear()} Consult Intake. All rights reserved.
             </p>
           </div>
         </div>

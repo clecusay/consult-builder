@@ -135,7 +135,7 @@ export default function SignupPage() {
           </div>
           <CardTitle className="text-2xl font-bold text-slate-900">Create Your Account</CardTitle>
           <CardDescription className="mt-1">
-            Set up your practice&apos;s consult builder
+            Set up your practice&apos;s consult intake
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-2">

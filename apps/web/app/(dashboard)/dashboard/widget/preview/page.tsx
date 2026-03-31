@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Code2, Loader2 } from 'lucide-react';
+import { ExternalLink, Code2, Loader2, Monitor } from 'lucide-react';
 import Link from 'next/link';
 import { PreviewErrorBoundary } from './preview-error-boundary';
 import { PreviewWithFlowSelector } from './preview-with-flow-selector';
@@ -42,7 +42,17 @@ export default async function WidgetPreviewPage() {
               rel="noopener noreferrer"
             >
               <ExternalLink className="h-4 w-4" />
-              Open in New Tab
+              View Widget
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`/widget/${slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Monitor className="h-4 w-4" />
+              View Page
             </a>
           </Button>
         </div>

@@ -126,12 +126,12 @@ export default function EmbedCodePage() {
 
   function embedCode(flow: WidgetMode) {
     return `<treatment-builder data-tenant-id="${tenantId ?? 'YOUR_TENANT_ID'}" data-flow="${flow}"></treatment-builder>
-<script src="https://widget.treatmentbuilder.com/widget.js" defer></script>`;
+<script src="https://widget.consultintake.com/widget.js" defer></script>`;
   }
 
   function locationSnippet(locationId: string, flow: WidgetMode) {
     return `<treatment-builder data-tenant-id="${tenantId ?? 'YOUR_TENANT_ID'}" data-location="${locationId}" data-flow="${flow}"></treatment-builder>
-<script src="https://widget.treatmentbuilder.com/widget.js" defer></script>`;
+<script src="https://widget.consultintake.com/widget.js" defer></script>`;
   }
 
   async function handleCopy(text: string, id: string) {

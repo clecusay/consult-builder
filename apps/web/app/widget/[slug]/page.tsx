@@ -1,0 +1,61 @@
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { notFound } from 'next/navigation';
+import Script from 'next/script';
+import type { Metadata } from 'next';
+
+interface Props {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ flow?: string; layout?: string; region_style?: string; location?: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createServiceRoleClient();
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('slug', slug)
+    .eq('status', 'active')
+    .single();
+
+  return {
+    title: tenant ? `${tenant.name} — Consultation` : 'Consultation',
+  };
+}
+
+export default async function WidgetFullPage({ params, searchParams }: Props) {
+  const { slug } = await params;
+  const { flow, layout, region_style, location } = await searchParams;
+
+  const supabase = await createServiceRoleClient();
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('id, name')
+    .eq('slug', slug)
+    .eq('status', 'active')
+    .single();
+
+  if (!tenant) notFound();
+
+  const attrs = [
+    `data-tenant-id="${tenant.id}"`,
+    'data-fullpage',
+    flow ? `data-flow="${flow}"` : '',
+    layout ? `data-layout="${layout}"` : '',
+    location ? `data-location="${location}"` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <>
+      <div
+        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+        dangerouslySetInnerHTML={{
+          __html: `<treatment-builder ${attrs} style="flex:1;display:flex"></treatment-builder>`,
+        }}
+      />
+      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
+    </>
+  );
+}

@@ -124,7 +124,7 @@ export default function IntegrationSettingsPage() {
       const testPayload = formatWebhookPayload(config.webhook_format, {
         event: 'test',
         timestamp: new Date().toISOString(),
-        message: 'This is a test webhook from Consult Builder.',
+        message: 'This is a test webhook from Consult Intake.',
       });
       const response = await fetch(config.webhook_url, {
         method: 'POST',

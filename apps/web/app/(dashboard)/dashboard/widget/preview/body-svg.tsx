@@ -150,8 +150,8 @@ export function BodySilhouette({
         {/* Pulse animation for unselected anchors */}
         <style>{`
           @keyframes anchorPulse {
-            0%, 100% { r: 11; opacity: 0.08; }
-            50% { r: 15; opacity: 0.18; }
+            0%, 100% { opacity: 0.08; }
+            50% { opacity: 0.18; }
           }
         `}</style>
       </defs>
@@ -380,8 +380,8 @@ export function FaceSilhouette({
         </filter>
         <style>{`
           @keyframes faceAnchorPulse {
-            0%, 100% { r: 11; opacity: 0.08; }
-            50% { r: 15; opacity: 0.18; }
+            0%, 100% { opacity: 0.08; }
+            50% { opacity: 0.18; }
           }
         `}</style>
       </defs>

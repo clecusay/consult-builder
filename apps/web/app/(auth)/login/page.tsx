@@ -99,7 +99,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold text-slate-900">Welcome Back</CardTitle>
           <CardDescription className="mt-1">
-            Sign in to your Consult Builder dashboard
+            Sign in to your Consult Intake dashboard
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-2">

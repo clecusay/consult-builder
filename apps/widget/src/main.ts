@@ -30,6 +30,8 @@ class TreatmentBuilderWidget extends HTMLElement {
   private apiBase = '';
   private tenantId = '';
   private locationId: string | null = null;
+  private layoutOverride: 'split' | 'guided' | null = null;
+  private fullpage = false;
   private eventsBound = false;
 
   // View state
@@ -71,6 +73,8 @@ class TreatmentBuilderWidget extends HTMLElement {
     }
     this.locationId = this.getAttribute('data-location') || null;
     const flowOverride = this.getAttribute('data-flow') || null;
+    this.layoutOverride = this.getAttribute('data-layout') as 'split' | 'guided' | null;
+    this.fullpage = this.hasAttribute('data-fullpage');
     this.apiBase = this.getAttribute('data-api') || '';
 
     this.shadow.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:96px 16px;color:#64748b;font-size:13px">Loading...</div>';
@@ -103,6 +107,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   private get widgetLayout(): 'split' | 'guided' {
+    if (this.layoutOverride) return this.layoutOverride;
     if (!this.config) return 'split';
     return (this.config as unknown as Record<string, unknown>).widget_layout as 'split' | 'guided' || 'split';
   }
@@ -298,8 +303,24 @@ class TreatmentBuilderWidget extends HTMLElement {
     const { branding } = this.config;
     const primary = branding.primary_color || '#e84393';
     const font = branding.font_family || '';
+    const fullpageCss = this.fullpage
+      ? `:host{display:flex;height:100%;}
+.tb-root{border-radius:0 !important;box-shadow:none !important;flex:1;}
+.tb-split,.tb-guided-body,.tb-guided-concerns{max-height:none !important;flex:1;}
+.tb-header h2{font-size:20px;}
+.tb-header p{font-size:14px;}
+.tb-step-label{font-size:11px;}
+.tb-gender-btn{font-size:13px;}
+.tb-region-name,.tb-svc-cat-title,.tb-label,.tb-summary-text,.tb-optin-label span,.tb-region-card-sub{font-size:13px;}
+.tb-panel-empty-title{font-size:16px;}
+.tb-panel-empty-sub{font-size:14px;}
+.tb-item-btn,.tb-region-header,.tb-search-wrap input{font-size:14px;}
+.tb-continue-btn,.tb-back-btn,.tb-submit-btn{font-size:14px;}
+.tb-input,.tb-select{font-size:14px;}
+.tb-footer span,.tb-footer button{font-size:12px;}`
+      : '';
     const cssVars = `:host{--tb-primary:${primary};${font ? `--tb-font:${font};` : ''}}`;
-    const style = raw(`<style>${cssVars}${widgetStyles}</style>`);
+    const style = raw(`<style>${cssVars}${widgetStyles}${fullpageCss}</style>`);
 
     let content: SafeHTML;
     if (this.view === 'success') content = this.renderSuccess();
@@ -451,17 +472,20 @@ class TreatmentBuilderWidget extends HTMLElement {
               ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
               : false}
 
-            <div class="tb-diagram-wrap">
+            <div class="tb-diagram-row">
               ${this.diagramView === 'body' ? html`
-                <div class="tb-side-toggle">
-                  <button class="tb-side-btn${this.bodySide === 'front' ? ' active' : ''}" data-side="front">${raw(ICONS.personFront)} Front</button>
-                  <button class="tb-side-btn${this.bodySide === 'back' ? ' active' : ''}" data-side="back">${raw(ICONS.personBack)} Back</button>
-                </div>
-              ` : false}
+                <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)}</button>
+              ` : html`<div class="tb-rotate-spacer"></div>`}
 
-              ${this.diagramView === 'body'
-                ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
-                : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+              <div class="tb-diagram-wrap">
+                ${this.diagramView === 'body'
+                  ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
+                  : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+              </div>
+
+              ${this.diagramView === 'body' ? html`
+                <button class="tb-rotate-btn" data-side="back" title="Back">${raw(ICONS.rotateCw)}</button>
+              ` : html`<div class="tb-rotate-spacer"></div>`}
             </div>
 
             <div class="tb-gender">
@@ -505,17 +529,20 @@ class TreatmentBuilderWidget extends HTMLElement {
             ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
             : false}
 
-          <div class="tb-guided-diagram">
+          <div class="tb-diagram-row">
             ${this.diagramView === 'body' ? html`
-              <div class="tb-side-toggle">
-                <button class="tb-side-btn${this.bodySide === 'front' ? ' active' : ''}" data-side="front">${raw(ICONS.personFront)} Front</button>
-                <button class="tb-side-btn${this.bodySide === 'back' ? ' active' : ''}" data-side="back">${raw(ICONS.personBack)} Back</button>
-              </div>
-            ` : false}
+              <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)}</button>
+            ` : html`<div class="tb-rotate-spacer"></div>`}
 
-            ${this.diagramView === 'body'
-              ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
-              : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+            <div class="tb-guided-diagram">
+              ${this.diagramView === 'body'
+                ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
+                : renderFaceSVG(this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
+            </div>
+
+            ${this.diagramView === 'body' ? html`
+              <button class="tb-rotate-btn" data-side="back" title="Back">${raw(ICONS.rotateCw)}</button>
+            ` : html`<div class="tb-rotate-spacer"></div>`}
           </div>
 
           <div class="tb-gender">
@@ -554,8 +581,8 @@ class TreatmentBuilderWidget extends HTMLElement {
       return html`
         <div class="tb-panel-empty">
           <div class="tb-panel-empty-icon">${raw(ICONS.cursor)}</div>
-          <p style="font-size:12px;font-weight:500;color:#334155">Select a body area</p>
-          <p style="font-size:11px;color:#94a3b8;margin-top:2px">Tap the <strong>+</strong> buttons on the body to see ${this.showConcerns ? 'available concerns' : 'available treatments'}</p>
+          <p class="tb-panel-empty-title">Select a body area</p>
+          <p class="tb-panel-empty-sub">Tap the <strong>+</strong> buttons on the body to see ${this.showConcerns ? 'available concerns' : 'available treatments'}</p>
         </div>
       `;
     }
@@ -604,10 +631,10 @@ class TreatmentBuilderWidget extends HTMLElement {
           return html`
             ${groups}
             ${this.concernsByRegion.length === 0
-              ? html`<p style="padding:16px 0;text-align:center;font-size:11px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+              ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns configured for the selected areas.</p>`
               : false}
             ${hasQuery && !anyVisible
-              ? html`<p style="padding:24px 0;text-align:center;font-size:12px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+              ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
               : false}
           `;
         })() : false}
@@ -712,10 +739,10 @@ class TreatmentBuilderWidget extends HTMLElement {
               return html`
                 ${groups}
                 ${this.concernsByRegion.length === 0
-                  ? html`<p style="padding:16px 0;text-align:center;font-size:11px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+                  ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns configured for the selected areas.</p>`
                   : false}
                 ${hasQuery && !anyVisible
-                  ? html`<p style="padding:24px 0;text-align:center;font-size:12px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+                  ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
                   : false}
               `;
             })() : false}
@@ -1132,7 +1159,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   private renderFooter(): SafeHTML {
     return html`
       <div class="tb-footer">
-        <span>Powered by Consult Builder</span>
+        <span>Powered by Consult Intake</span>
         <button data-action="reset-footer">${raw(ICONS.refresh)} Reset</button>
       </div>
     `;

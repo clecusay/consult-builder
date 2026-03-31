@@ -58,15 +58,15 @@ export const FACE_ANCHORS: BodyAnchor[] = [
 ];
 
 export const HIGHLIGHT_RADII: Record<string, number> = {
-  face: 30, neck: 22, chest: 40, abdomen: 38, flanks: 28,
-  arms: 32, hands: 22, intimate: 28, back: 45, buttocks: 38,
-  thighs: 45, 'lower-legs': 40,
-  'upper-face': 35, midface: 35, lips: 25, 'lower-face': 25,
+  face: 24, neck: 22, chest: 24, abdomen: 24, flanks: 24,
+  arms: 24, hands: 22, intimate: 24, back: 24, buttocks: 24,
+  thighs: 24, 'lower-legs': 24,
+  'upper-face': 24, midface: 24, lips: 22, 'lower-face': 22,
 };
 
 // Viewboxes
 export const FEMALE_BODY_VB = '-15 -15 230 685';
-export const MALE_BODY_VB = '-15 -15 230 628';
+export const MALE_BODY_VB = '-15 -15 230 685';
 export const FACE_VB = '-5 -5 210 285';
 
 // Face outline paths

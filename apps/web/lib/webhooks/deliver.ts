@@ -14,7 +14,7 @@ export async function deliverWebhook(
   const body = JSON.stringify(formatted);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'User-Agent': 'TreatmentBuilder-Webhook/1.0',
+    'User-Agent': 'ConsultIntake-Webhook/1.0',
   };
 
   if (secret && !shouldSkipSigning(format)) {
