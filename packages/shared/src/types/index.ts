@@ -115,7 +115,7 @@ export interface Concern {
 }
 
 // --- Form Field ---
-export type FormFieldType = 'text' | 'email' | 'phone' | 'date' | 'textarea' | 'select' | 'checkbox' | 'radio';
+export type FormFieldType = 'text' | 'email' | 'phone' | 'date' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'location';
 
 export interface FormField {
   id: string;

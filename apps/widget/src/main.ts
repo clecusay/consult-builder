@@ -1101,11 +1101,20 @@ class TreatmentBuilderWidget extends HTMLElement {
   private renderFormField(field: WidgetFormField): SafeHTML {
     const name = field.field_key || `custom_${field.id}`;
     const req = field.is_required ? raw('required') : false;
-    const isFullWidth = field.field_type === 'textarea' || field.field_type === 'select' || field.field_type === 'radio';
+    const isFullWidth = field.field_type === 'textarea' || field.field_type === 'select' || field.field_type === 'radio' || field.field_type === 'location';
     const wrapStyle = isFullWidth ? ' style="grid-column:1/-1"' : '';
 
     let fieldEl: SafeHTML;
-    if (field.field_type === 'textarea') {
+    if (field.field_type === 'location') {
+      const locs = this.config?.locations || [];
+      if (locs.length <= 1) return html``;
+      fieldEl = html`
+        <select class="tb-select" name="location_id" ${req}>
+          <option value="">${field.placeholder || 'Select a location...'}</option>
+          ${locs.map(loc => html`<option value="${loc.id}"${this.locationId === loc.id ? raw(' selected') : false}>${loc.name}${loc.city ? html` — ${loc.city}${loc.state ? html`, ${loc.state}` : false}` : false}</option>`)}
+        </select>
+      `;
+    } else if (field.field_type === 'textarea') {
       fieldEl = html`<textarea class="tb-textarea" name="${name}" placeholder="${field.placeholder || ''}" rows="2" ${req}></textarea>`;
     } else if (field.field_type === 'select') {
       fieldEl = html`
@@ -1343,6 +1352,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     const customFields: Record<string, unknown> = {};
 
     for (const field of fields) {
+      if (field.field_type === 'location') continue; // handled separately via location_id
       const name = field.field_key || `custom_${field.id}`;
 
       if (field.field_key && OPT_IN_KEYS.has(field.field_key)) {
@@ -1391,9 +1401,12 @@ class TreatmentBuilderWidget extends HTMLElement {
       }
     }
 
+    // Location from form field overrides the data-attribute
+    const formLocationId = (fd.get('location_id') as string || '').trim();
+
     const payload: Record<string, unknown> = {
       tenant_id: this.tenantId,
-      location_id: this.locationId || undefined,
+      location_id: formLocationId || this.locationId || undefined,
       first_name: systemValues.first_name || '',
       last_name: systemValues.last_name || '',
       email: systemValues.email || '',

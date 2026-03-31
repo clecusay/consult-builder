@@ -26,6 +26,7 @@ import {
   Phone,
   Calendar,
   Stethoscope,
+  MapPin,
 } from 'lucide-react';
 
 interface CustomField {
@@ -80,6 +81,13 @@ const presetFields: PresetField[] = [
     icon: Stethoscope,
     description: 'Let visitors select a procedure of interest',
     hasOptions: true,
+  },
+  {
+    key: 'location',
+    label: 'Location',
+    field_type: 'location',
+    icon: MapPin,
+    description: 'Let visitors choose a practice location',
   },
 ];
 
@@ -164,6 +172,7 @@ export default function FormFieldsPage() {
         phone: false,
         date_of_birth: false,
         procedure: false,
+        location: false,
       };
       const customOnly: CustomField[] = [];
       const savedServiceNames = new Set<string>();
@@ -188,6 +197,8 @@ export default function FormFieldsPage() {
           for (const svc of svcList) {
             if (opts.includes(svc.name)) savedServiceNames.add(svc.id);
           }
+        } else if (f.field_key === 'location' || (f.label === 'Location' && f.field_type === 'location')) {
+          presetState.location = true;
         } else {
           customOnly.push(f);
         }
@@ -297,6 +308,9 @@ export default function FormFieldsPage() {
     }
     if (enabledPresets.procedure) {
       allRows.push({ tenant_id: tenantId, field_key: 'procedure', label: 'Procedure', field_type: 'select', placeholder: null, is_required: false, display_order: order++, options: procedureOptions.length > 0 ? procedureOptions : null });
+    }
+    if (enabledPresets.location) {
+      allRows.push({ tenant_id: tenantId, field_key: 'location', label: 'Location', field_type: 'location', placeholder: 'Select a location...', is_required: false, display_order: order++, options: null });
     }
 
     // ── 3. Custom fields ──
