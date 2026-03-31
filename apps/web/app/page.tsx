@@ -87,57 +87,23 @@ const INTEGRATIONS = [
   },
 ];
 
-const PRICING_TIERS = [
-  {
-    name: 'Starter',
-    price: '$49',
-    period: '/mo',
-    description: 'For solo practitioners getting started with smart intake.',
-    features: [
-      '1 practice location',
-      '1 consultation widget',
-      '500 submissions/month',
-      'Email notifications',
-      'Basic branding',
-      'Standard support',
-    ],
-    cta: 'Start Free Trial',
-    highlighted: false,
-  },
-  {
-    name: 'Business',
-    price: '$149',
-    period: '/mo',
-    description: 'For growing practices that need integrations and analytics.',
-    features: [
-      'Up to 3 locations',
-      'Unlimited widgets',
-      '5,000 submissions/month',
-      'Webhooks & integrations',
-      'Full branding control',
-      'Analytics dashboard',
-      'Priority support',
-    ],
-    cta: 'Start Free Trial',
-    highlighted: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    description: 'For multi-location practices with custom requirements.',
-    features: [
-      'Unlimited locations',
-      'Unlimited submissions',
-      'Custom integrations & API',
-      'Dedicated account manager',
-      'SSO & advanced security',
-      'Custom SLA',
-    ],
-    cta: 'Contact Sales',
-    highlighted: false,
-  },
-];
+const PRICING_TIER = {
+  name: 'Enterprise',
+  price: 'Custom',
+  period: '',
+  description: 'Tailored for your practice. Custom integrations, dedicated support, and everything you need to convert visitors into patients.',
+  features: [
+    'Unlimited locations',
+    'Unlimited widgets & submissions',
+    'Custom integrations & API',
+    'Dedicated account manager',
+    'Full branding control',
+    'Analytics dashboard',
+    'SSO & advanced security',
+    'Custom SLA',
+  ],
+  cta: 'Contact Sales',
+};
 
 const FAQ_ITEMS = [
   {
@@ -259,204 +225,36 @@ export default function Home() {
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="pt-28 pb-16 sm:pt-36 sm:pb-24 px-6">
-        <div className="mx-auto max-w-[1330px] grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left */}
-          <div className="animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1 mb-6">
-              <span className="text-xs font-semibold text-indigo-600">
-                Built for med spas & plastic surgery
-              </span>
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
-              Pre-qualify patients{' '}
-              <span className="text-indigo-600">before</span> they ever
-              pick up the phone
-            </h1>
-            <p className="mt-6 text-lg leading-relaxed text-slate-500 max-w-xl">
-              The interactive consultation widget that captures treatment interest,
-              qualifies leads, and gives your team the context they need to close —
-              from the very first call.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/signup"
-                className="inline-flex h-12 items-center justify-center rounded-lg bg-indigo-600 px-6 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-colors gap-2"
-              >
-                Start Free Trial
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <a
-                href="#how-it-works"
-                className="inline-flex h-12 items-center justify-center rounded-lg border border-slate-200 px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                See how it works
-              </a>
-            </div>
+        <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1 mb-6">
+            <span className="text-xs font-semibold text-indigo-600">
+              Built for med spas & plastic surgery
+            </span>
           </div>
-
-          {/* Right — Widget mockup */}
-          <div className="relative animate-fade-in-up animation-delay-150">
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/50 overflow-hidden">
-              {/* Widget header */}
-              <div className="bg-indigo-600 px-6 py-4 text-center">
-                <p className="text-sm font-bold text-white">Build Your Consultation Plan</p>
-                <p className="text-xs text-indigo-200 mt-0.5">
-                  Select the areas you&apos;d like to address
-                </p>
-              </div>
-
-              {/* Step indicator */}
-              <div className="flex items-center justify-center gap-0 py-3 px-4 border-b border-slate-100">
-                {['Select Areas', 'Your Concerns', 'Your Info'].map((step, i) => (
-                  <div key={step} className="flex items-center">
-                    {i > 0 && (
-                      <div
-                        className="h-[2px] w-6"
-                        style={{ backgroundColor: i <= 1 ? '#4f46e5' : '#e2e8f0' }}
-                      />
-                    )}
-                    <div className="flex flex-col items-center gap-1">
-                      <div
-                        className="flex items-center justify-center rounded-full"
-                        style={{
-                          width: i === 1 ? 24 : 18,
-                          height: i === 1 ? 24 : 18,
-                          backgroundColor: i <= 1 ? '#4f46e5' : '#e2e8f0',
-                        }}
-                      >
-                        {i === 0 ? (
-                          <Check className="h-2.5 w-2.5 text-white" />
-                        ) : (
-                          <span
-                            className="text-[9px] font-bold"
-                            style={{ color: i <= 1 ? 'white' : '#94a3b8' }}
-                          >
-                            {i + 1}
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className="text-[8px] font-medium"
-                        style={{ color: i <= 1 ? '#4f46e5' : '#94a3b8' }}
-                      >
-                        {step}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Body + concerns mockup */}
-              <div className="flex" style={{ minHeight: 300 }}>
-                {/* Body silhouette */}
-                <div className="flex-1 flex items-center justify-center p-4 border-r border-slate-100">
-                  <svg viewBox="0 0 120 300" className="h-[240px] w-auto">
-                    {/* Head */}
-                    <ellipse cx="60" cy="28" rx="18" ry="22" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Neck */}
-                    <rect x="52" y="48" width="16" height="14" rx="4" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Torso */}
-                    <path d="M30 62 Q28 62 26 70 L20 140 L30 180 L50 190 L70 190 L90 180 L100 140 L94 70 Q92 62 90 62 Z" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Left arm */}
-                    <path d="M26 70 Q14 90 8 130 Q6 145 10 155 L18 140 Q22 110 30 90" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Right arm */}
-                    <path d="M94 70 Q106 90 112 130 Q114 145 110 155 L102 140 Q98 110 90 90" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Left leg */}
-                    <path d="M40 188 L35 250 L30 295 L45 295 L48 250 L52 190" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-                    {/* Right leg */}
-                    <path d="M68 190 L72 250 L75 295 L90 295 L85 250 L80 188" fill="#faf5f5" stroke="#6366f1" strokeWidth="0.8" />
-
-                    {/* Face anchor — selected */}
-                    <circle cx="60" cy="28" r="8" fill="#6366f1" opacity="0.15" />
-                    <circle cx="60" cy="28" r="5" fill="#6366f1" />
-                    <path d="M57.5 28 l1.8 1.8 3-3.6" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                    {/* Neck anchor — selected */}
-                    <circle cx="60" cy="56" r="8" fill="#6366f1" opacity="0.15" />
-                    <circle cx="60" cy="56" r="5" fill="#6366f1" />
-                    <path d="M57.5 56 l1.8 1.8 3-3.6" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                    {/* Chest anchor — unselected */}
-                    <circle cx="72" cy="100" r="5" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-                    <line x1="70" y1="100" x2="74" y2="100" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                    <line x1="72" y1="98" x2="72" y2="102" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-
-                    {/* Abdomen anchor — unselected */}
-                    <circle cx="60" cy="150" r="5" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-                    <line x1="58" y1="150" x2="62" y2="150" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                    <line x1="60" y1="148" x2="60" y2="152" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-
-                    {/* Thighs anchor — unselected */}
-                    <circle cx="65" cy="220" r="5" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-                    <line x1="63" y1="220" x2="67" y2="220" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                    <line x1="65" y1="218" x2="65" y2="222" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </div>
-
-                {/* Right concerns panel */}
-                <div className="flex-1 p-3 space-y-2 overflow-hidden">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                    <ChevronDown className="h-3 w-3" /> Face
-                  </div>
-                  {['Fine Lines & Wrinkles', 'Uneven Skin Tone', 'Volume Loss'].map(
-                    (concern, i) => (
-                      <div
-                        key={concern}
-                        className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] ${
-                          i < 2
-                            ? 'border-indigo-200 bg-indigo-50 font-medium'
-                            : 'border-slate-200'
-                        }`}
-                      >
-                        <div
-                          className={`h-3 w-3 rounded flex items-center justify-center shrink-0 ${
-                            i < 2 ? 'bg-indigo-600' : 'border border-slate-300'
-                          }`}
-                        >
-                          {i < 2 && <Check className="h-2 w-2 text-white" />}
-                        </div>
-                        {concern}
-                      </div>
-                    )
-                  )}
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1 pt-1">
-                    <ChevronDown className="h-3 w-3" /> Neck
-                  </div>
-                  {['Loose Skin', 'Neck Bands'].map((concern, i) => (
-                    <div
-                      key={concern}
-                      className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] ${
-                        i === 0
-                          ? 'border-indigo-200 bg-indigo-50 font-medium'
-                          : 'border-slate-200'
-                      }`}
-                    >
-                      <div
-                        className={`h-3 w-3 rounded flex items-center justify-center shrink-0 ${
-                          i === 0 ? 'bg-indigo-600' : 'border border-slate-300'
-                        }`}
-                      >
-                        {i === 0 && <Check className="h-2 w-2 text-white" />}
-                      </div>
-                      {concern}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bottom bar */}
-              <div className="border-t border-slate-100 px-4 py-2.5 flex items-center justify-between bg-slate-50/50">
-                <span className="text-[10px] text-slate-400">
-                  2 areas &middot; 3 concerns selected
-                </span>
-                <div className="inline-flex h-7 items-center rounded-md bg-indigo-600 px-3 text-[11px] font-medium text-white">
-                  Continue
-                </div>
-              </div>
-            </div>
-
-            {/* Decorative offset */}
-            <div className="absolute -z-10 -top-3 -right-3 h-full w-full rounded-2xl bg-indigo-100/40 border border-indigo-100" />
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
+            Pre-qualify patients{' '}
+            <span className="text-indigo-600">before</span> they ever
+            pick up the phone
+          </h1>
+          <p className="mt-6 text-lg leading-relaxed text-slate-500 max-w-xl mx-auto">
+            The interactive consultation widget that captures treatment interest,
+            qualifies leads, and gives your team the context they need to close —
+            from the very first call.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href="/signup"
+              className="inline-flex h-12 items-center justify-center rounded-lg bg-indigo-600 px-6 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-colors gap-2"
+            >
+              Start Free Trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="#how-it-works"
+              className="inline-flex h-12 items-center justify-center rounded-lg border border-slate-200 px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              See how it works
+            </a>
           </div>
         </div>
       </section>
@@ -702,58 +500,37 @@ export default function Home() {
           <div className="text-center mb-14">
             <SectionBadge number="04" />
             <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Simple, transparent pricing
+              Enterprise pricing
             </h2>
             <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto">
-              Start free for 14 days. No credit card required. Upgrade as you grow.
+              Custom plans tailored to your practice. Get in touch and we&apos;ll build the right package for you.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {PRICING_TIERS.map((tier) => (
-              <div
-                key={tier.name}
-                className={`rounded-xl border p-6 sm:p-8 flex flex-col ${
-                  tier.highlighted
-                    ? 'border-indigo-600 bg-white shadow-lg shadow-indigo-600/10 ring-1 ring-indigo-600'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                {tier.highlighted && (
-                  <div className="inline-flex self-start items-center rounded-full bg-indigo-600 px-2.5 py-0.5 text-[11px] font-semibold text-white mb-4">
-                    Most popular
-                  </div>
-                )}
-                <h3 className="text-lg font-semibold text-slate-900">{tier.name}</h3>
-                <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-slate-900">{tier.price}</span>
-                  {tier.period && (
-                    <span className="text-sm text-slate-500">{tier.period}</span>
-                  )}
-                </div>
-                <p className="mt-3 text-sm text-slate-500">{tier.description}</p>
-
-                <ul className="mt-6 space-y-3 flex-1">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-700">
-                      <Check className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href={tier.name === 'Enterprise' ? '#' : '/signup'}
-                  className={`mt-8 inline-flex h-11 items-center justify-center rounded-lg px-6 text-sm font-semibold transition-colors ${
-                    tier.highlighted
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                      : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {tier.cta}
-                </Link>
+          <div className="max-w-md mx-auto">
+            <div className="rounded-xl border border-indigo-600 bg-white shadow-lg shadow-indigo-600/10 ring-1 ring-indigo-600 p-6 sm:p-8 flex flex-col">
+              <h3 className="text-lg font-semibold text-slate-900">{PRICING_TIER.name}</h3>
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-slate-900">{PRICING_TIER.price}</span>
               </div>
-            ))}
+              <p className="mt-3 text-sm text-slate-500">{PRICING_TIER.description}</p>
+
+              <ul className="mt-6 space-y-3 flex-1">
+                {PRICING_TIER.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <Check className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="#"
+                className="mt-8 inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-6 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
+              >
+                {PRICING_TIER.cta}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
