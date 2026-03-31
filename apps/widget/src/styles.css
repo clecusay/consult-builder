@@ -1094,4 +1094,263 @@
   .tb-form-grid {
     grid-template-columns: 1fr;
   }
+
+  .tb-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- Card-based Region Selector --- */
+
+.tb-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.tb-region-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px 16px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+.tb-region-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.tb-region-card.selected {
+  background: color-mix(in srgb, var(--tb-card-accent, var(--tb-primary)) 6%, #fff);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--tb-card-accent, var(--tb-primary)) 15%, transparent);
+}
+
+.tb-region-card-icon {
+  width: 32px;
+  height: 32px;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.tb-region-card-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tb-region-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.2;
+}
+
+.tb-region-card-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.tb-region-card-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.tb-region-card-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tb-card-panel {
+  margin-top: 16px;
+  padding: 0 16px;
+}
+
+/* --- Treatment Builder Flow --- */
+
+.tb-pill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.tb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 100px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.3;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.tb-pill:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tb-pill.selected {
+  font-weight: 600;
+}
+
+.tb-pill-check {
+  display: flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.tb-pill-check svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tb-other-field {
+  padding: 8px 20px 0;
+}
+
+.tb-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 8px;
+  gap: 12px;
+}
+
+.tb-header-warm {
+  background: linear-gradient(180deg, #fffbeb 0%, transparent 100%);
+  border-radius: 12px 12px 0 0;
+  margin: -20px -20px 0;
+  padding: 20px 20px 16px;
+}
+
+/* Bridge / Pre-sell */
+
+.tb-bridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.tb-bridge-logo {
+  max-height: 48px;
+  margin-bottom: 32px;
+  opacity: 0.8;
+}
+
+.tb-bridge-animation {
+  margin-bottom: 32px;
+}
+
+.tb-bridge-pulse {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  opacity: 0.2;
+  animation: tb-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tb-pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.2; }
+  50% { transform: scale(1.2); opacity: 0.4; }
+}
+
+.tb-bridge-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+}
+
+.tb-bridge-msg {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #334155;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.tb-bridge-msg.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tb-bridge-cta {
+  margin-top: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 100px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  animation: tb-fade-in 0.6s ease forwards;
+}
+
+.tb-bridge-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tb-bridge-cta svg {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes tb-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .tb-pill {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .tb-bridge {
+    min-height: 320px;
+    padding: 32px 20px;
+  }
+
+  .tb-bridge-msg {
+    font-size: 14px;
+  }
 }

@@ -352,6 +352,7 @@ export async function GET(request: Request) {
     },
     widget_mode: config.widget_mode || 'regions_concerns',
     diagram_type: config.diagram_type || 'full_body',
+    region_style: config.region_style || 'diagram',
     widget_layout: config.widget_layout || 'split',
     regions,
     service_categories: serviceCategories,

@@ -34,10 +34,9 @@ interface Location {
 }
 
 const FLOW_OPTIONS: { mode: WidgetMode; label: string }[] = [
-  { mode: 'regions_concerns_services', label: 'Full Journey' },
   { mode: 'regions_services', label: 'Direct Services' },
-  { mode: 'regions_concerns', label: 'Concerns Only' },
-{ mode: 'services_only', label: 'Service Menu' },
+  { mode: 'regions_concerns', label: 'Concerns Focus' },
+  { mode: 'treatment_builder', label: 'Treatment Builder' },
 ];
 
 function FlowSelect({ value, onChange }: { value: WidgetMode; onChange: (v: WidgetMode) => void }) {

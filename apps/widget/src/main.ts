@@ -13,13 +13,16 @@ import type {
   SelectedService,
   Gender,
   WidgetMode,
+  RegionStyle,
 } from '@treatment-builder/shared';
 import widgetStyles from './styles.css?inline';
 import { html, raw, SafeHTML } from './template';
 import { ICONS } from './icons';
 import { renderBodySVG, renderFaceSVG } from './svg-renderer';
+import { getPainPoints, getOutcomes, BARRIERS, type TBOption } from './treatment-builder-data';
 
-type View = 'body' | 'guided-concerns' | 'form' | 'success';
+type View = 'body' | 'guided-concerns' | 'form' | 'success'
+  | 'tb-pain-points' | 'tb-outcomes' | 'tb-barriers' | 'tb-bridge' | 'tb-lead-capture';
 
 class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
@@ -39,6 +42,15 @@ class TreatmentBuilderWidget extends HTMLElement {
   private selectedRegionSlugs = new Set<string>();
   private selectedConcernIds = new Set<string>();
   private selectedServiceIds = new Set<string>();
+
+  // Treatment Builder state
+  private selectedPainPoints = new Set<string>();
+  private selectedOutcomes = new Set<string>();
+  private selectedBarriers = new Set<string>();
+  private tbOtherPainPoint = '';
+  private tbOtherOutcome = '';
+  private bridgeAnimationStep = 0;
+  private bridgeTimer: ReturnType<typeof setTimeout> | null = null;
 
   // UI state
   private expandedRegions = new Set<string>();
@@ -105,6 +117,19 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private get showServices(): boolean {
     return this.widgetMode.includes('services');
+  }
+
+  private get regionStyle(): RegionStyle {
+    if (!this.config) return 'diagram';
+    return (this.config as unknown as Record<string, unknown>).region_style as RegionStyle || 'diagram';
+  }
+
+  private get useCards(): boolean {
+    return this.regionStyle === 'cards';
+  }
+
+  private get isTreatmentBuilder(): boolean {
+    return this.widgetMode === 'treatment_builder';
   }
 
   private get isFaceOnly(): boolean {
@@ -255,6 +280,13 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.expandedRegions.clear();
     this.concernSearchQuery = '';
     this.formError = '';
+    this.selectedPainPoints.clear();
+    this.selectedOutcomes.clear();
+    this.selectedBarriers.clear();
+    this.tbOtherPainPoint = '';
+    this.tbOtherOutcome = '';
+    this.bridgeAnimationStep = 0;
+    if (this.bridgeTimer) { clearTimeout(this.bridgeTimer); this.bridgeTimer = null; }
     this.render();
   }
 
@@ -273,6 +305,11 @@ class TreatmentBuilderWidget extends HTMLElement {
     if (this.view === 'success') content = this.renderSuccess();
     else if (this.view === 'form') content = this.renderForm();
     else if (this.view === 'guided-concerns') content = this.renderGuidedConcerns();
+    else if (this.view === 'tb-pain-points') content = this.renderTBPainPoints();
+    else if (this.view === 'tb-outcomes') content = this.renderTBOutcomes();
+    else if (this.view === 'tb-barriers') content = this.renderTBBarriers();
+    else if (this.view === 'tb-bridge') content = this.renderTBBridge();
+    else if (this.view === 'tb-lead-capture') content = this.renderTBLeadCapture();
     else content = this.renderBodyView();
 
     this.shadow.innerHTML = html`${style}${content}`.value;
@@ -308,8 +345,90 @@ class TreatmentBuilderWidget extends HTMLElement {
   // ── Body Diagram View ──
 
   private renderBodyView(): SafeHTML {
+    if (this.useCards) return this.renderCardBody();
     if (this.isGuided) return this.renderGuidedBody();
     return this.renderSplitBody();
+  }
+
+  // ── Card-based Region Selector ──
+
+  private renderCardBody(): SafeHTML {
+    const cfg = this.config!;
+    const pc = this.primaryColor;
+
+    // Group regions by body_area for display, deduplicating by slug
+    const seen = new Set<string>();
+    const uniqueRegions: WidgetRegion[] = [];
+    for (const r of this.genderRegions) {
+      if (!seen.has(r.slug)) {
+        seen.add(r.slug);
+        uniqueRegions.push(r);
+      }
+    }
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>${cfg.branding.cta_text || 'Build Your Consultation Plan'}</h2>
+          <p>Select the areas you'd like to address</p>
+        </div>
+
+        ${this.renderStepIndicator()}
+
+        <div class="tb-gender" style="margin-bottom:16px">
+          <button class="tb-gender-btn${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female">Female</button>
+          <button class="tb-gender-btn${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male">Male</button>
+        </div>
+
+        <div class="tb-card-grid">
+          ${uniqueRegions.map(region => {
+            const isSelected = this.selectedRegionSlugs.has(region.slug);
+            const icon = ICONS.regionCard[region.slug] || ICONS.cursor;
+            const concernCount = region.concerns.length;
+            return html`
+              <button
+                class="tb-region-card${isSelected ? ' selected' : ''}"
+                data-region-slug="${region.slug}"
+                style="${isSelected ? `border-color:${pc};--tb-card-accent:${pc}` : ''}"
+              >
+                <div class="tb-region-card-icon" style="${isSelected ? `color:${pc}` : ''}">${raw(icon)}</div>
+                <div class="tb-region-card-name">${region.name}</div>
+                ${concernCount > 0 ? html`<div class="tb-region-card-sub">${concernCount} concern${concernCount !== 1 ? 's' : ''}</div>` : false}
+                ${isSelected ? html`<div class="tb-region-card-check" style="background:${pc}">${raw(ICONS.check)}</div>` : false}
+              </button>
+            `;
+          })}
+        </div>
+
+        ${this.selectedRegionSlugs.size > 0 ? html`
+          <div class="tb-guided-chips" style="margin-top:16px">
+            ${this.selectedRegions.map(r => html`
+              <span class="tb-chip">
+                ${r.name}
+                <button class="tb-chip-x" data-remove-region="${r.slug}">${raw(ICONS.x)}</button>
+              </span>
+            `)}
+          </div>
+        ` : false}
+
+        ${this.showConcerns || this.showServices ? html`
+          <div class="tb-card-panel">
+            ${this.renderPanel()}
+          </div>
+        ` : false}
+
+        ${!(this.showConcerns || this.showServices) && this.selectedRegionSlugs.size > 0 ? html`
+          <div style="padding:16px 0;text-align:center">
+            <button class="tb-continue-btn" data-action="continue">
+              Continue ${raw(ICONS.chevronRight)}
+            </button>
+          </div>
+        ` : false}
+
+        ${this.renderFooter()}
+      </div>
+    `;
   }
 
   private renderSplitBody(): SafeHTML {
@@ -634,6 +753,273 @@ class TreatmentBuilderWidget extends HTMLElement {
     `;
   }
 
+  // ══════════════════════════════════════════════════════
+  // Treatment Builder Flow (Steps 2-6)
+  // Step 1 is the body area selection (shared with other modes)
+  // ══════════════════════════════════════════════════════
+
+  private renderTBStepIndicator(currentStep: number): SafeHTML {
+    const steps = ['Body Area', 'Pain Points', 'Outcomes', 'Barriers', 'Your Plan'];
+    const pc = this.primaryColor;
+    return html`
+      <div class="tb-steps">
+        ${steps.map((label, i) => {
+          const isActive = i === currentStep;
+          const isCompleted = i < currentStep;
+          const dotClass = `tb-step-dot ${isActive ? 'active' : isCompleted ? 'completed' : 'pending'}`;
+          return html`
+            ${i > 0 ? html`<div class="tb-step-line" style="background:${i <= currentStep ? pc : '#e2e8f0'}"></div>` : false}
+            <div class="tb-step">
+              <div class="${dotClass}">
+                ${isCompleted
+                  ? raw('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>')
+                  : html`<span class="tb-step-num" style="color:${isActive ? '#fff' : '#94a3b8'}">${i + 1}</span>`}
+              </div>
+              <span class="tb-step-label" style="color:${isActive ? pc : '#94a3b8'}">${label}</span>
+            </div>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  private renderTBPillGrid(options: TBOption[], selectedIds: Set<string>, dataAttr: string): SafeHTML {
+    const pc = this.primaryColor;
+    return html`
+      <div class="tb-pill-grid">
+        ${options.map(opt => {
+          const sel = selectedIds.has(opt.id);
+          return html`
+            <button
+              class="tb-pill${sel ? ' selected' : ''}"
+              data-${dataAttr}="${opt.id}"
+              style="${sel ? `border-color:${pc};background:color-mix(in srgb, ${pc} 8%, #fff);color:${pc}` : ''}"
+            >
+              ${sel ? html`<span class="tb-pill-check" style="color:${pc}">${raw(ICONS.check)}</span>` : false}
+              ${opt.label}
+            </button>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  // ── Step 2: Pain Points ──
+
+  private renderTBPainPoints(): SafeHTML {
+    const cfg = this.config!;
+    const options = getPainPoints(this.selectedRegionSlugs);
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>We'd love to understand you better.</h2>
+          <p>How do these concerns affect your daily life? Select all that apply.</p>
+        </div>
+
+        ${this.renderTBStepIndicator(1)}
+
+        ${this.renderTBPillGrid(options, this.selectedPainPoints, 'tb-pain')}
+
+        <div class="tb-other-field">
+          <input type="text" class="tb-input" placeholder="Other — describe in your own words..." value="${this.tbOtherPainPoint}" data-tb-other="pain" />
+        </div>
+
+        <div class="tb-nav">
+          <button class="tb-back-btn" data-action="tb-back-to-body">${raw(ICONS.chevronLeft)} Back</button>
+          <button class="tb-continue-btn${this.selectedPainPoints.size === 0 && !this.tbOtherPainPoint ? ' disabled' : ''}" data-action="tb-to-outcomes" ${this.selectedPainPoints.size === 0 && !this.tbOtherPainPoint ? raw('disabled') : false}>
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
+        </div>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  // ── Step 3: Outcomes ──
+
+  private renderTBOutcomes(): SafeHTML {
+    const cfg = this.config!;
+    const options = getOutcomes(this.selectedRegionSlugs);
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header tb-header-warm">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>Now picture the possibilities.</h2>
+          <p>If we could help, how would that change things for you?</p>
+        </div>
+
+        ${this.renderTBStepIndicator(2)}
+
+        ${this.renderTBPillGrid(options, this.selectedOutcomes, 'tb-outcome')}
+
+        <div class="tb-other-field">
+          <input type="text" class="tb-input" placeholder="Other — tell us your vision..." value="${this.tbOtherOutcome}" data-tb-other="outcome" />
+        </div>
+
+        <div class="tb-nav">
+          <button class="tb-back-btn" data-action="tb-to-pain-points">${raw(ICONS.chevronLeft)} Back</button>
+          <button class="tb-continue-btn${this.selectedOutcomes.size === 0 && !this.tbOtherOutcome ? ' disabled' : ''}" data-action="tb-to-barriers" ${this.selectedOutcomes.size === 0 && !this.tbOtherOutcome ? raw('disabled') : false}>
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
+        </div>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  // ── Step 4: Barriers ──
+
+  private renderTBBarriers(): SafeHTML {
+    const cfg = this.config!;
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>What's held you back until now?</h2>
+          <p>No judgment — these are common and we can help address every one of them.</p>
+        </div>
+
+        ${this.renderTBStepIndicator(3)}
+
+        ${this.renderTBPillGrid(BARRIERS, this.selectedBarriers, 'tb-barrier')}
+
+        <div class="tb-nav">
+          <button class="tb-back-btn" data-action="tb-to-outcomes">${raw(ICONS.chevronLeft)} Back</button>
+          <button class="tb-continue-btn" data-action="tb-to-bridge">
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
+        </div>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  // ── Step 5: Bridge / Pre-sell ──
+
+  private get bridgeMessages(): string[] {
+    const cfg = this.config!;
+    const practiceName = cfg.tenant.name;
+    return [
+      'Putting together your personalized analysis...',
+      `Thank you for trusting ${practiceName}.`,
+      'We help patients just like you achieve incredible results.',
+      'Picture yourself with more confidence and freedom in just a short time.',
+      "You're going to love the way you feel.",
+    ];
+  }
+
+  private startBridgeAnimation() {
+    if (this.bridgeTimer) clearTimeout(this.bridgeTimer);
+    this.bridgeAnimationStep = 0;
+    this.render();
+
+    const advance = () => {
+      this.bridgeAnimationStep++;
+      if (this.bridgeAnimationStep < this.bridgeMessages.length + 1) {
+        this.render();
+        this.bridgeTimer = setTimeout(advance, this.bridgeAnimationStep === 1 ? 2000 : 1800);
+      } else {
+        // Animation complete — show CTA
+        this.render();
+      }
+    };
+    this.bridgeTimer = setTimeout(advance, 2200);
+  }
+
+  private renderTBBridge(): SafeHTML {
+    const cfg = this.config!;
+    const messages = this.bridgeMessages;
+    const step = this.bridgeAnimationStep;
+    const showCta = step >= messages.length;
+    const pc = this.primaryColor;
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-bridge">
+          ${cfg.tenant.logo_url ? html`<img class="tb-bridge-logo" src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+
+          <div class="tb-bridge-animation">
+            <div class="tb-bridge-pulse" style="background:${pc}"></div>
+          </div>
+
+          <div class="tb-bridge-messages">
+            ${messages.map((msg, i) => html`
+              <p class="tb-bridge-msg${i < step ? ' visible' : ''}">${msg}</p>
+            `)}
+          </div>
+
+          ${showCta ? html`
+            <button class="tb-bridge-cta" data-action="tb-to-lead-capture" style="background:${pc}">
+              See Your Recommendations ${raw(ICONS.chevronRight)}
+            </button>
+          ` : false}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Step 6: Lead Capture ──
+
+  private renderTBLeadCapture(): SafeHTML {
+    const cfg = this.config!;
+    const pc = this.primaryColor;
+
+    // Partition fields: opt-in checkboxes vs regular fields
+    const isOptIn = (f: WidgetFormField) => f.field_key?.endsWith('_opt_in');
+    const contactFields = cfg.form_fields.filter(f => !isOptIn(f));
+    const optInFields = cfg.form_fields.filter(f => isOptIn(f));
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
+          <h2>You're one step away from a new you.</h2>
+          <p>Fill in your details and a member of our team will reach out to discuss your personalized plan.</p>
+        </div>
+
+        ${this.renderTBStepIndicator(4)}
+
+        <form class="tb-form-body" id="tb-form" novalidate>
+          ${contactFields.length > 0 ? html`
+            <div class="tb-form-grid">
+              ${contactFields.map(field => this.renderFormField(field))}
+            </div>
+          ` : false}
+
+          ${optInFields.length > 0 ? html`
+            <div class="tb-optin">
+              <p class="tb-optin-title">Communication Preferences</p>
+              ${optInFields.map(field => html`
+                <label class="tb-optin-label">
+                  <input type="checkbox" name="${field.field_key || 'custom_' + field.id}"/>
+                  <span>${field.placeholder || field.label}</span>
+                </label>
+              `)}
+            </div>
+          ` : false}
+
+          ${this.formError ? html`<p class="tb-form-error">${this.formError}</p>` : false}
+
+          <div class="tb-nav">
+            <button type="button" class="tb-back-btn" data-action="tb-to-barriers">${raw(ICONS.chevronLeft)} Back</button>
+            <button type="submit" class="tb-submit-btn" style="background:${pc}" ${this.submitting ? raw('disabled') : false}>
+              ${this.submitting ? 'Submitting...' : cfg.branding.cta_text || 'Request Consultation'}
+            </button>
+          </div>
+        </form>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
   // ── Form View ──
 
   private renderForm(): SafeHTML {
@@ -765,7 +1151,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         if (!target) return;
 
         // Walk up to find actionable element
-        const el = target.closest<HTMLElement>('[data-action], [data-gender], [data-side], [data-concern-id], [data-service-id], [data-toggle-region], [data-remove-region]');
+        const el = target.closest<HTMLElement>('[data-action], [data-gender], [data-side], [data-concern-id], [data-service-id], [data-toggle-region], [data-remove-region], [data-region-slug], [data-tb-pain], [data-tb-outcome], [data-tb-barrier]');
         if (!el) {
           // Check if click was inside an SVG anchor group
           const anchor = target.closest<SVGElement>('.tb-anchor');
@@ -789,11 +1175,13 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         // Actions
         const action = el.getAttribute('data-action');
-        if (action === 'continue') { this.view = 'form'; this.render(); return; }
-        if (action === 'guided-to-concerns') { this.view = 'guided-concerns'; this.render(); return; }
+        if (action === 'continue') { this.view = this.isTreatmentBuilder ? 'tb-pain-points' : 'form'; this.render(); return; }
+        if (action === 'guided-to-concerns') { this.view = this.isTreatmentBuilder ? 'tb-pain-points' : 'guided-concerns'; this.render(); return; }
         if (action === 'guided-back-to-body') { this.view = 'body'; this.render(); return; }
         if (action === 'back-to-body') {
-          if (this.isGuided) { this.view = 'guided-concerns'; } else { this.view = 'body'; }
+          if (this.isTreatmentBuilder) { this.view = 'tb-barriers'; }
+          else if (this.isGuided) { this.view = 'guided-concerns'; }
+          else { this.view = 'body'; }
           this.formError = '';
           this.render();
           return;
@@ -801,6 +1189,14 @@ class TreatmentBuilderWidget extends HTMLElement {
         if (action === 'back-to-body-diagram') { this.diagramView = 'body'; this.render(); return; }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }
+
+        // Treatment Builder navigation
+        if (action === 'tb-back-to-body') { this.view = 'body'; this.render(); return; }
+        if (action === 'tb-to-pain-points') { this.view = 'tb-pain-points'; this.render(); return; }
+        if (action === 'tb-to-outcomes') { this.view = 'tb-outcomes'; this.render(); return; }
+        if (action === 'tb-to-barriers') { this.view = 'tb-barriers'; this.render(); return; }
+        if (action === 'tb-to-bridge') { this.view = 'tb-bridge'; this.startBridgeAnimation(); return; }
+        if (action === 'tb-to-lead-capture') { this.view = 'tb-lead-capture'; this.render(); return; }
 
         // Gender
         const gender = el.getAttribute('data-gender');
@@ -825,6 +1221,20 @@ class TreatmentBuilderWidget extends HTMLElement {
         // Region remove
         const removeRegion = el.getAttribute('data-remove-region');
         if (removeRegion) { e.stopPropagation(); this.removeRegion(removeRegion); return; }
+
+        // Region card toggle (card-based selector)
+        const regionSlug = el.getAttribute('data-region-slug');
+        if (regionSlug) { this.handleAnchorClick([regionSlug]); return; }
+
+        // Treatment Builder pill toggles
+        const tbPain = el.getAttribute('data-tb-pain');
+        if (tbPain) { if (this.selectedPainPoints.has(tbPain)) this.selectedPainPoints.delete(tbPain); else this.selectedPainPoints.add(tbPain); this.render(); return; }
+
+        const tbOutcome = el.getAttribute('data-tb-outcome');
+        if (tbOutcome) { if (this.selectedOutcomes.has(tbOutcome)) this.selectedOutcomes.delete(tbOutcome); else this.selectedOutcomes.add(tbOutcome); this.render(); return; }
+
+        const tbBarrier = el.getAttribute('data-tb-barrier');
+        if (tbBarrier) { if (this.selectedBarriers.has(tbBarrier)) this.selectedBarriers.delete(tbBarrier); else this.selectedBarriers.add(tbBarrier); this.render(); return; }
       });
     }
 
@@ -843,6 +1253,16 @@ class TreatmentBuilderWidget extends HTMLElement {
           }
         });
       });
+    }
+
+    // Treatment Builder "Other" text inputs
+    const otherPain = root.querySelector<HTMLInputElement>('[data-tb-other="pain"]');
+    if (otherPain) {
+      otherPain.addEventListener('input', () => { this.tbOtherPainPoint = otherPain.value; });
+    }
+    const otherOutcome = root.querySelector<HTMLInputElement>('[data-tb-other="outcome"]');
+    if (otherOutcome) {
+      otherOutcome.addEventListener('input', () => { this.tbOtherOutcome = otherOutcome.value; });
     }
 
     // Form submission
@@ -958,6 +1378,29 @@ class TreatmentBuilderWidget extends HTMLElement {
       custom_fields: customFields,
       source_url: window.location.href,
     };
+
+    // Include Treatment Builder data if in that mode
+    if (this.isTreatmentBuilder) {
+      const painPointLabels = getPainPoints(this.selectedRegionSlugs)
+        .filter(p => this.selectedPainPoints.has(p.id))
+        .map(p => p.label);
+      if (this.tbOtherPainPoint) painPointLabels.push(this.tbOtherPainPoint);
+
+      const outcomeLabels = getOutcomes(this.selectedRegionSlugs)
+        .filter(o => this.selectedOutcomes.has(o.id))
+        .map(o => o.label);
+      if (this.tbOtherOutcome) outcomeLabels.push(this.tbOtherOutcome);
+
+      const barrierLabels = BARRIERS
+        .filter(b => this.selectedBarriers.has(b.id))
+        .map(b => b.label);
+
+      payload.treatment_builder = {
+        pain_points: painPointLabels,
+        desired_outcomes: outcomeLabels,
+        barriers: barrierLabels,
+      };
+    }
 
     if (optInValues.sms_opt_in !== undefined) payload.sms_opt_in = optInValues.sms_opt_in;
     if (optInValues.email_opt_in !== undefined) payload.email_opt_in = optInValues.email_opt_in;

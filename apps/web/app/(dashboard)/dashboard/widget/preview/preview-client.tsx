@@ -32,14 +32,35 @@ import type {
   WidgetConfigResponse,
   WidgetConcern,
   WidgetMode,
+  RegionStyle,
 } from '@treatment-builder/shared';
 import { BodySilhouette, FaceSilhouette } from './body-svg';
+
+// Region card icon data (simple inline SVGs for preview)
+const REGION_CARD_ICONS: Record<string, string> = {
+  'abdomen': 'M12 14a6 5 0 1 0 0-1 6 5 0 0 0 0 1Z M9 11c0-2 1.5-3 3-3s3 1 3 3',
+  'arms': 'M6 4s-2 6 0 10 4 6 4 8 M18 4s2 6 0 10-4 6-4 8',
+  'chest': 'M8 8c-2 0-4 2-4 4s2 4 4 4 M16 8c2 0 4 2 4 4s-2 4-4 4 M8 12h8',
+  'flanks': 'M7 6c-1 3-1 6 0 9s2 5 3 6 M17 6c1 3 1 6 0 9s-2 5-3 6',
+  'hands': 'M18 11V6a2 2 0 0 0-4 0v1 M14 10V4a2 2 0 0 0-4 0v6 M10 10.5V5a2 2 0 0 0-4 0v9',
+  'thighs': 'M8 4c-1 4-2 8-1 12s2 4 3 6 M16 4c1 4 2 8 1 12s-2 4-3 6',
+  'lower-legs': 'M9 2c0 4-1 8 0 12s2 5 1 8 M15 2c0 4 1 8 0 12s-2 5-1 8',
+  'back': 'M12 2s-4 3-4 8 1 7 1 12 M12 2s4 3 4 8-1 7-1 12 M10 8h4 M9 13h6',
+  'buttocks': 'M6 10c-2 2-2 5 0 7s5 2 6 0 M18 10c2 2 2 5 0 7s-5 2-6 0',
+  'upper-face': 'M4 12a8 8 0 0 1 16 0',
+  'midface': 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z',
+  'lower-face': 'M4 12c0 4.4 3.6 8 8 8s8-3.6 8-8 M9 16c1 1 2 1.5 3 1.5s2-.5 3-1.5',
+  'neck': 'M8 4v12s-2 4-4 6 M16 4v12s2 4 4 6 M8 10h8',
+  'lips': 'M2 12c3-3 5-4 10-4s7 1 10 4c-3 3-5 5-10 5s-7-2-10-5z M2 12c3 1 5 1.5 10 1.5S19 13 22 12',
+  'intimate': 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+};
 
 interface Props {
   tenantId: string;
   locationId?: string | null;
   widgetModeOverride?: WidgetMode | null;
   widgetLayoutOverride?: 'split' | 'guided' | null;
+  regionStyleOverride?: RegionStyle | null;
 }
 
 type View = 'body' | 'guided-concerns' | 'form' | 'success';
@@ -97,7 +118,7 @@ function StepIndicator({ currentStep, primaryColor }: { currentStep: number; pri
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, widgetModeOverride, widgetLayoutOverride }: Props) {
+export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, widgetModeOverride, widgetLayoutOverride, regionStyleOverride }: Props) {
   const [config, setConfig] = useState<WidgetConfigResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,6 +211,8 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
   const showServices = widgetMode.includes('services');
   const widgetLayout = widgetLayoutOverride ?? (config as unknown as Record<string, unknown>)?.widget_layout as string ?? 'split';
   const isGuided = widgetLayout === 'guided';
+  const regionStyle: RegionStyle = regionStyleOverride ?? (config as unknown as Record<string, unknown>)?.region_style as RegionStyle ?? 'diagram';
+  const useCards = regionStyle === 'cards';
 
   // Regions for the selected gender
   const genderRegions = useMemo(() => {
@@ -470,6 +493,70 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
     }
 
     return button;
+  }
+
+  // ── Card Grid for Region Selection ─────────────────────────────────
+  function renderCardGrid() {
+    // Deduplicate regions by slug
+    const seen = new Set<string>();
+    const uniqueRegions = genderRegions.filter(r => {
+      if (seen.has(r.slug)) return false;
+      seen.add(r.slug);
+      return true;
+    });
+
+    return (
+      <div className="grid grid-cols-3 gap-2 px-4 py-4">
+        {uniqueRegions.map(region => {
+          const isSelected = selectedRegionSlugs.has(region.slug);
+          const iconPath = REGION_CARD_ICONS[region.slug];
+          return (
+            <button
+              key={region.slug}
+              type="button"
+              onClick={() => handleAnchorClick([region.slug])}
+              className={`relative flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-center transition-all ${
+                isSelected
+                  ? 'shadow-sm'
+                  : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+              }`}
+              style={isSelected ? {
+                borderColor: primaryColor,
+                backgroundColor: `color-mix(in srgb, ${primaryColor} 6%, #fff)`,
+              } : undefined}
+            >
+              {iconPath && (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isSelected ? primaryColor : '#64748b'}
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-6 w-6"
+                >
+                  <path d={iconPath} />
+                </svg>
+              )}
+              <span className="text-[11px] font-semibold text-slate-700 leading-tight">
+                {region.name}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {region.concerns.length} concern{region.concerns.length !== 1 ? 's' : ''}
+              </span>
+              {isSelected && (
+                <div
+                  className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Check className="h-2.5 w-2.5 text-white" />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
   }
 
   // ── Success View ────────────────────────────────────────────────────
@@ -770,52 +857,58 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
         </div>
 
         <div className="flex flex-col items-center px-4 py-4">
-          {diagramView === 'face' && (
-            <button
-              type="button"
-              onClick={() => setDiagramView('body')}
-              className="flex items-center gap-1 self-start mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Back to Body
-            </button>
-          )}
+          {useCards ? (
+            renderCardGrid()
+          ) : (
+            <>
+              {diagramView === 'face' && (
+                <button
+                  type="button"
+                  onClick={() => setDiagramView('body')}
+                  className="flex items-center gap-1 self-start mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Back to Body
+                </button>
+              )}
 
-          <div className="relative w-full max-w-[240px] flex items-center justify-center">
-            {diagramView !== 'face' && (
-              <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
-                <button type="button" onClick={() => setBodySide('front')}
-                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'front' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
-                  style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}>
-                  Front
-                </button>
-                <button type="button" onClick={() => setBodySide('back')}
-                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'back' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
-                  style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}>
-                  Back
-                </button>
+              <div className="relative w-full max-w-[240px] flex items-center justify-center">
+                {diagramView !== 'face' && (
+                  <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
+                    <button type="button" onClick={() => setBodySide('front')}
+                      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'front' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
+                      style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}>
+                      Front
+                    </button>
+                    <button type="button" onClick={() => setBodySide('back')}
+                      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${bodySide === 'back' ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
+                      style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}>
+                      Back
+                    </button>
+                  </div>
+                )}
+
+                {diagramView === 'body' ? (
+                  <BodySilhouette
+                    gender={gender}
+                    bodySide={bodySide}
+                    selectedRegionSlugs={selectedRegionSlugs}
+                    activeRegionSlugs={activeRegionSlugs}
+                    onAnchorClick={handleAnchorClick}
+                    onFaceClick={() => setDiagramView('face')}
+                    primaryColor={primaryColor}
+                  />
+                ) : (
+                  <FaceSilhouette
+                    selectedRegionSlugs={selectedRegionSlugs}
+                    activeRegionSlugs={activeRegionSlugs}
+                    onAnchorClick={handleAnchorClick}
+                    primaryColor={primaryColor}
+                  />
+                )}
               </div>
-            )}
-
-            {diagramView === 'body' ? (
-              <BodySilhouette
-                gender={gender}
-                bodySide={bodySide}
-                selectedRegionSlugs={selectedRegionSlugs}
-                activeRegionSlugs={activeRegionSlugs}
-                onAnchorClick={handleAnchorClick}
-                onFaceClick={() => setDiagramView('face')}
-                primaryColor={primaryColor}
-              />
-            ) : (
-              <FaceSilhouette
-                selectedRegionSlugs={selectedRegionSlugs}
-                activeRegionSlugs={activeRegionSlugs}
-                onAnchorClick={handleAnchorClick}
-                primaryColor={primaryColor}
-              />
-            )}
-          </div>
+            </>
+          )}
 
           {/* Gender toggle */}
           <div className="flex items-center gap-1 mt-2">
@@ -900,82 +993,88 @@ export function WidgetPreviewClient({ tenantId, locationId: pinnedLocationId, wi
 
         {/* Split layout: body left, panel right — stacked on mobile */}
         <div className="flex flex-col sm:flex-row" style={{ minHeight: 460 }}>
-          {/* Left: Body / Face Diagram */}
+          {/* Left: Body / Face Diagram or Card Grid */}
           <div className="flex-1 flex flex-col items-center justify-between py-2 px-2 border-b sm:border-b-0 sm:border-r border-slate-100 max-h-[320px] sm:max-h-none">
-            {diagramView === 'face' && (
-              <button
-                type="button"
-                onClick={() => setDiagramView('body')}
-                className="flex items-center gap-1 self-start ml-2 mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                Back to Body
-              </button>
-            )}
+            {useCards ? (
+              renderCardGrid()
+            ) : (
+              <>
+                {diagramView === 'face' && (
+                  <button
+                    type="button"
+                    onClick={() => setDiagramView('body')}
+                    className="flex items-center gap-1 self-start ml-2 mb-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Back to Body
+                  </button>
+                )}
 
-            <div className="relative w-full max-w-[200px] flex-1 flex items-center">
-              {/* Front/Back icon tabs — overlaid top-right of diagram */}
-              {diagramView !== 'face' && (
-                <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setBodySide('front')}
-                    className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
-                      bodySide === 'front'
-                        ? 'text-white border-transparent shadow-sm'
-                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
-                    }`}
-                    style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="5" r="3" />
-                      <line x1="12" y1="8" x2="12" y2="16" />
-                      <line x1="8" y1="12" x2="16" y2="12" />
-                      <line x1="12" y1="16" x2="8" y2="22" />
-                      <line x1="12" y1="16" x2="16" y2="22" />
-                    </svg>
-                    Front
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBodySide('back')}
-                    className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
-                      bodySide === 'back'
-                        ? 'text-white border-transparent shadow-sm'
-                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
-                    }`}
-                    style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="5" r="3" />
-                      <line x1="12" y1="8" x2="12" y2="16" />
-                      <line x1="12" y1="16" x2="8" y2="22" />
-                      <line x1="12" y1="16" x2="16" y2="22" />
-                    </svg>
-                    Back
-                  </button>
+                <div className="relative w-full max-w-[200px] flex-1 flex items-center">
+                  {/* Front/Back icon tabs — overlaid top-right of diagram */}
+                  {diagramView !== 'face' && (
+                    <div className="absolute top-0 right-0 z-10 flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setBodySide('front')}
+                        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
+                          bodySide === 'front'
+                            ? 'text-white border-transparent shadow-sm'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
+                        }`}
+                        style={bodySide === 'front' ? { backgroundColor: primaryColor } : undefined}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="5" r="3" />
+                          <line x1="12" y1="8" x2="12" y2="16" />
+                          <line x1="8" y1="12" x2="16" y2="12" />
+                          <line x1="12" y1="16" x2="8" y2="22" />
+                          <line x1="12" y1="16" x2="16" y2="22" />
+                        </svg>
+                        Front
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBodySide('back')}
+                        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all border ${
+                          bodySide === 'back'
+                            ? 'text-white border-transparent shadow-sm'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
+                        }`}
+                        style={bodySide === 'back' ? { backgroundColor: primaryColor } : undefined}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="5" r="3" />
+                          <line x1="12" y1="8" x2="12" y2="16" />
+                          <line x1="12" y1="16" x2="8" y2="22" />
+                          <line x1="12" y1="16" x2="16" y2="22" />
+                        </svg>
+                        Back
+                      </button>
+                    </div>
+                  )}
+
+                  {diagramView === 'body' ? (
+                    <BodySilhouette
+                      gender={gender}
+                      bodySide={bodySide}
+                      selectedRegionSlugs={selectedRegionSlugs}
+                      activeRegionSlugs={activeRegionSlugs}
+                      onAnchorClick={handleAnchorClick}
+                      onFaceClick={() => setDiagramView('face')}
+                      primaryColor={primaryColor}
+                    />
+                  ) : (
+                    <FaceSilhouette
+                      selectedRegionSlugs={selectedRegionSlugs}
+                      activeRegionSlugs={activeRegionSlugs}
+                      onAnchorClick={handleAnchorClick}
+                      primaryColor={primaryColor}
+                    />
+                  )}
                 </div>
-              )}
-
-              {diagramView === 'body' ? (
-                <BodySilhouette
-                  gender={gender}
-                  bodySide={bodySide}
-                  selectedRegionSlugs={selectedRegionSlugs}
-                  activeRegionSlugs={activeRegionSlugs}
-                  onAnchorClick={handleAnchorClick}
-                  onFaceClick={() => setDiagramView('face')}
-                  primaryColor={primaryColor}
-                />
-              ) : (
-                <FaceSilhouette
-                  selectedRegionSlugs={selectedRegionSlugs}
-                  activeRegionSlugs={activeRegionSlugs}
-                  onAnchorClick={handleAnchorClick}
-                  primaryColor={primaryColor}
-                />
-              )}
-            </div>
+              </>
+            )}
 
             {/* Gender toggle */}
             <div className="flex items-center gap-1 mt-2">

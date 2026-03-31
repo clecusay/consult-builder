@@ -49,13 +49,13 @@ export interface UserProfile {
 
 // --- Widget Config ---
 export type WidgetMode =
-  | 'regions_concerns_services'
   | 'regions_services'
   | 'regions_concerns'
-  | 'concerns_only'
-  | 'services_only';
+  | 'treatment_builder';
 
 export type DiagramType = 'face' | 'body' | 'full_body';
+
+export type RegionStyle = 'diagram' | 'cards';
 
 export type WidgetLayout = 'split' | 'guided';
 
@@ -77,6 +77,7 @@ export interface WidgetConfig {
   custom_css: string | null;
   widget_mode: WidgetMode;
   diagram_type: DiagramType;
+  region_style: RegionStyle;
   widget_layout: WidgetLayout;
   created_at: string;
   updated_at: string;
@@ -271,6 +272,7 @@ export interface WidgetConfigResponse {
   };
   widget_mode: WidgetMode;
   diagram_type: DiagramType;
+  region_style: RegionStyle;
   widget_layout: WidgetLayout;
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];

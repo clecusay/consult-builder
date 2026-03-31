@@ -15,18 +15,17 @@ import {
   Save,
   Check,
   ArrowRight,
-  Layers,
   MessageSquare,
   GitBranch,
+  LayoutGrid,
+  Bone,
 } from 'lucide-react';
 import { logAuditClient } from '@/lib/audit/client';
 
 type WidgetMode =
-  | 'regions_concerns_services'
   | 'regions_services'
   | 'regions_concerns'
-  | 'concerns_only'
-  | 'services_only';
+  | 'treatment_builder';
 
 interface FlowOption {
   mode: WidgetMode;
@@ -38,14 +37,6 @@ interface FlowOption {
 
 const flowOptions: FlowOption[] = [
   {
-    mode: 'regions_concerns_services',
-    label: 'Full Journey',
-    description:
-      'Visitors select body regions, then choose their concerns, then see recommended services. Best for full-service plastic surgery centers.',
-    icon: GitBranch,
-    steps: ['Body Region', 'Concerns', 'Services', 'Form'],
-  },
-  {
     mode: 'regions_services',
     label: 'Direct Services',
     description:
@@ -55,24 +46,42 @@ const flowOptions: FlowOption[] = [
   },
   {
     mode: 'regions_concerns',
-    label: 'Concerns Only',
+    label: 'Concerns Focus',
     description:
       'Visitors select body regions and concerns without service matching. Great for general consultation lead capture.',
     icon: MessageSquare,
     steps: ['Body Region', 'Concerns', 'Form'],
   },
-{
-    mode: 'services_only',
-    label: 'Service Menu',
+  {
+    mode: 'treatment_builder',
+    label: 'Treatment Builder',
     description:
-      'Visitors browse your service catalog directly. Perfect for med spas and practices with a clear service menu.',
-    icon: Layers,
-    steps: ['Services', 'Form'],
+      'A guided, consultative experience. Visitors share their concerns, desired outcomes, and barriers before connecting with your team.',
+    icon: GitBranch,
+    steps: ['Body Area', 'Pain Points', 'Outcomes', 'Barriers', 'Bridge', 'Lead Capture'],
+  },
+];
+
+type RegionStyle = 'diagram' | 'cards';
+
+const regionStyleOptions: { value: RegionStyle; label: string; description: string; icon: React.ElementType }[] = [
+  {
+    value: 'diagram',
+    label: 'Body Diagram',
+    description: 'Interactive SVG silhouette with clickable body regions',
+    icon: Bone,
+  },
+  {
+    value: 'cards',
+    label: 'Card Grid',
+    description: 'Clean card layout for selecting body areas — modern and mobile-friendly',
+    icon: LayoutGrid,
   },
 ];
 
 export default function WidgetFlowPage() {
   const [selected, setSelected] = useState<WidgetMode>('regions_concerns');
+  const [regionStyle, setRegionStyle] = useState<RegionStyle>('diagram');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -98,12 +107,15 @@ export default function WidgetFlowPage() {
 
       const { data: config } = await supabase
         .from('widget_configs')
-        .select('widget_mode')
+        .select('widget_mode, region_style')
         .eq('tenant_id', profile.tenant_id)
         .single();
 
       if (config?.widget_mode) {
         setSelected(config.widget_mode as WidgetMode);
+      }
+      if (config?.region_style) {
+        setRegionStyle(config.region_style as RegionStyle);
       }
       setLoading(false);
     }
@@ -118,7 +130,7 @@ export default function WidgetFlowPage() {
 
     await supabase
       .from('widget_configs')
-      .update({ widget_mode: selected })
+      .update({ widget_mode: selected, region_style: regionStyle })
       .eq('tenant_id', tenantId);
 
     setSaving(false);
@@ -128,7 +140,7 @@ export default function WidgetFlowPage() {
     logAuditClient({
       action: 'widget_config.flow_updated',
       entity_type: 'widget_config',
-      new_data: { widget_mode: selected },
+      new_data: { widget_mode: selected, region_style: regionStyle },
     });
   }
 
@@ -231,6 +243,58 @@ export default function WidgetFlowPage() {
                     ))}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Region Selection Style */}
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Body Area Selection</h2>
+        <p className="text-sm text-muted-foreground">
+          Choose how visitors select their body areas
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {regionStyleOptions.map((option) => {
+          const isActive = regionStyle === option.value;
+          const Icon = option.icon;
+          return (
+            <Card
+              key={option.value}
+              className={`cursor-pointer transition-all ${
+                isActive
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-md'
+                  : 'hover:border-slate-300 hover:shadow-sm'
+              }`}
+              onClick={() => setRegionStyle(option.value)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-lg ${
+                      isActive
+                        ? 'bg-indigo-100 text-indigo-600'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  {isActive && (
+                    <Badge className="bg-indigo-500 text-white">
+                      Selected
+                    </Badge>
+                  )}
+                </div>
+                <CardTitle className="mt-3 text-base">
+                  {option.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {option.description}
+                </p>
               </CardContent>
             </Card>
           );

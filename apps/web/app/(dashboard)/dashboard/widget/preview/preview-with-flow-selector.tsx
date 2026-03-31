@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ArrowRight } from 'lucide-react';
-import type { WidgetMode } from '@treatment-builder/shared';
+import type { WidgetMode, RegionStyle } from '@treatment-builder/shared';
 import { WidgetPreviewClient } from './preview-client';
 
 const FLOW_OPTIONS: {
@@ -19,12 +19,6 @@ const FLOW_OPTIONS: {
   steps: string[];
 }[] = [
   {
-    mode: 'regions_concerns_services',
-    label: 'Full Journey',
-    description: 'Body regions → concerns → services → form. Best for full-service plastic surgery centers.',
-    steps: ['Body Region', 'Concerns', 'Services', 'Form'],
-  },
-  {
     mode: 'regions_services',
     label: 'Direct Services',
     description: 'Body regions → services → form. Ideal for practices focused on specific procedures.',
@@ -32,15 +26,15 @@ const FLOW_OPTIONS: {
   },
   {
     mode: 'regions_concerns',
-    label: 'Concerns Only',
+    label: 'Concerns Focus',
     description: 'Body regions → concerns → form. Great for general consultation lead capture.',
     steps: ['Body Region', 'Concerns', 'Form'],
   },
-{
-    mode: 'services_only',
-    label: 'Service Menu',
-    description: 'Service catalog → form. Perfect for med spas with a clear service menu.',
-    steps: ['Services', 'Form'],
+  {
+    mode: 'treatment_builder',
+    label: 'Treatment Builder',
+    description: 'Guided consultative experience — pain points, outcomes, barriers, then lead capture.',
+    steps: ['Body Area', 'Pain Points', 'Outcomes', 'Barriers', 'Bridge', 'Lead Capture'],
   },
 ];
 
@@ -52,6 +46,7 @@ interface Props {
 export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedFlow, setSelectedFlow] = useState<WidgetMode>('regions_concerns');
   const [selectedLayout, setSelectedLayout] = useState<'split' | 'guided'>('split');
+  const [selectedRegionStyle, setSelectedRegionStyle] = useState<RegionStyle>('diagram');
 
   const selectedOption = FLOW_OPTIONS.find((o) => o.mode === selectedFlow)!;
 
@@ -116,6 +111,35 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
             </div>
           </div>
 
+          {/* Region style selector */}
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">Body Area Selection</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedRegionStyle('diagram')}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  selectedRegionStyle === 'diagram'
+                    ? 'bg-indigo-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Body Diagram
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRegionStyle('cards')}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                  selectedRegionStyle === 'cards'
+                    ? 'bg-indigo-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Card Grid
+              </button>
+            </div>
+          </div>
+
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <p className="text-sm text-muted-foreground">{selectedOption.description}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -154,7 +178,7 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
         </div>
 
         {/* Live Preview */}
-        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} widgetLayoutOverride={selectedLayout} />
+        <WidgetPreviewClient tenantId={tenantId} widgetModeOverride={selectedFlow} widgetLayoutOverride={selectedLayout} regionStyleOverride={selectedRegionStyle} />
       </Card>
     </div>
   );
