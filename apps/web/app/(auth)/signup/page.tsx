@@ -63,6 +63,13 @@ export default function SignupPage() {
       return;
     }
 
+    // Supabase returns a user with no identities when the email is already registered
+    if (authData.user.identities?.length === 0) {
+      setError('An account with this email already exists. Please sign in instead.');
+      setLoading(false);
+      return;
+    }
+
     // Create tenant and user profile via API
     const res = await fetch('/api/auth/setup', {
       method: 'POST',
