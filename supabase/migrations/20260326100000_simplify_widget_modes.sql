@@ -7,8 +7,11 @@ UPDATE widget_configs
 SET widget_mode = 'regions_concerns'
 WHERE widget_mode IN ('regions_concerns_services', 'concerns_only', 'services_only');
 
--- Step 2: Recreate the enum with only the valid modes
--- PostgreSQL doesn't support DROP VALUE from enums, so we rename → create → migrate → drop
+-- Step 2: Drop the default before swapping the enum type
+ALTER TABLE widget_configs
+  ALTER COLUMN widget_mode DROP DEFAULT;
+
+-- Step 3: Recreate the enum with only the valid modes
 ALTER TYPE widget_mode RENAME TO widget_mode_old;
 
 CREATE TYPE widget_mode AS ENUM (
@@ -22,3 +25,7 @@ ALTER TABLE widget_configs
   USING widget_mode::text::widget_mode;
 
 DROP TYPE widget_mode_old;
+
+-- Step 4: Re-add the default
+ALTER TABLE widget_configs
+  ALTER COLUMN widget_mode SET DEFAULT 'regions_concerns';
