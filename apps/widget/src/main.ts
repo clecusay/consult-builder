@@ -24,6 +24,41 @@ import { getPainPoints, getOutcomes, BARRIERS, type TBOption } from './treatment
 type View = 'body' | 'guided-concerns' | 'form' | 'success'
   | 'tb-pain-points' | 'tb-outcomes' | 'tb-barriers' | 'tb-bridge' | 'tb-lead-capture';
 
+const DEFAULT_CARD_DESCRIPTIONS: Record<string, string> = {
+  'upper-face': 'Forehead, brow, temples',
+  'midface': 'Cheeks, under-eyes, nose',
+  'lower-face': 'Jawline, chin, jowls',
+  'lips': 'Volume, shape, lines',
+  'neck': 'Bands, laxity, contour',
+  'abdomen': 'Tuck, lipo, skin tightening',
+  'chest': 'Augmentation, lift, reduction',
+  'flanks': 'Love handles, contouring',
+  'arms': 'Lift, lipo, tightening',
+  'hands': 'Volume, veins, skin quality',
+  'thighs': 'Inner, outer, lift, lipo',
+  'lower-legs': 'Calves, ankles',
+  'buttocks': 'BBL, lift, contouring',
+  'intimate': 'Labiaplasty, rejuvenation',
+  'back': 'Acne, posture, fat reduction',
+};
+
+const SLUG_TO_GROUP: Record<string, string> = {
+  'upper-face': 'face', 'midface': 'face', 'lower-face': 'face',
+  'lips': 'face', 'neck': 'face',
+  'abdomen': 'upper_body', 'arms': 'upper_body', 'chest': 'upper_body',
+  'flanks': 'upper_body', 'hands': 'upper_body', 'back': 'upper_body',
+  'thighs': 'lower_body', 'lower-legs': 'lower_body',
+  'buttocks': 'lower_body', 'intimate': 'lower_body',
+};
+
+const DISPLAY_GROUP_LABELS: Record<string, string> = {
+  'face': 'Face',
+  'upper_body': 'Upper Body',
+  'lower_body': 'Lower Body',
+};
+
+const DISPLAY_GROUP_ORDER = ['face', 'upper_body', 'lower_body'];
+
 class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
   private config: WidgetConfigResponse | null = null;
@@ -59,6 +94,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   private concernSearchQuery = '';
   private submitting = false;
   private formError = '';
+  private lockedHeight: number | null = null;
 
   constructor() {
     super();
@@ -73,7 +109,9 @@ class TreatmentBuilderWidget extends HTMLElement {
     }
     this.locationId = this.getAttribute('data-location') || null;
     const flowOverride = this.getAttribute('data-flow') || null;
-    this.layoutOverride = this.getAttribute('data-layout') as 'split' | 'guided' | null;
+    const layoutOverride = this.getAttribute('data-layout') || null;
+    const regionStyleOverride = this.getAttribute('data-region-style') || null;
+    this.layoutOverride = layoutOverride as 'split' | 'guided' | null;
     this.fullpage = this.hasAttribute('data-fullpage');
     this.apiBase = this.getAttribute('data-api') || '';
 
@@ -83,6 +121,8 @@ class TreatmentBuilderWidget extends HTMLElement {
       let url = `${this.apiBase}/api/widget/config?tenant_id=${encodeURIComponent(this.tenantId)}`;
       if (this.locationId) url += `&location=${encodeURIComponent(this.locationId)}`;
       if (flowOverride) url += `&flow=${encodeURIComponent(flowOverride)}`;
+      if (layoutOverride) url += `&layout=${encodeURIComponent(layoutOverride)}`;
+      if (regionStyleOverride) url += `&region_style=${encodeURIComponent(regionStyleOverride)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Config error: ${res.status}`);
       this.config = await res.json();
@@ -368,6 +408,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.selectedBarriers.clear();
     this.tbOtherPainPoint = '';
     this.tbOtherOutcome = '';
+    this.lockedHeight = null;
     this.bridgeAnimationStep = 0;
     if (this.bridgeTimer) { clearTimeout(this.bridgeTimer); this.bridgeTimer = null; }
     this.render();
@@ -402,6 +443,20 @@ class TreatmentBuilderWidget extends HTMLElement {
 
     this.shadow.innerHTML = html`${style}${content}`.value;
     this.wireEvents();
+
+    // Lock height after first render to prevent layout shifts
+    if (!this.fullpage && this.lockedHeight === null) {
+      requestAnimationFrame(() => {
+        const root = this.shadow.querySelector('.tb-root') as HTMLElement;
+        if (root) {
+          this.lockedHeight = root.offsetHeight;
+          root.style.minHeight = `${this.lockedHeight}px`;
+        }
+      });
+    } else if (!this.fullpage && this.lockedHeight !== null) {
+      const root = this.shadow.querySelector('.tb-root') as HTMLElement;
+      if (root) root.style.minHeight = `${this.lockedHeight}px`;
+    }
   }
 
   // ── Step Indicator ──
@@ -442,9 +497,8 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private renderCardBody(): SafeHTML {
     const cfg = this.config!;
-    const pc = this.primaryColor;
 
-    // Group regions by body_area for display, deduplicating by slug
+    // Deduplicate regions by slug
     const seen = new Set<string>();
     const uniqueRegions: WidgetRegion[] = [];
     for (const r of this.genderRegions) {
@@ -452,6 +506,14 @@ class TreatmentBuilderWidget extends HTMLElement {
         seen.add(r.slug);
         uniqueRegions.push(r);
       }
+    }
+
+    // Group by display_group
+    const groups = new Map<string, WidgetRegion[]>();
+    for (const r of uniqueRegions) {
+      const group = (r as unknown as Record<string, unknown>).display_group as string || SLUG_TO_GROUP[r.slug] || 'upper_body';
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group)!.push(r);
     }
 
     return html`
@@ -464,54 +526,39 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         ${this.renderStepIndicator()}
 
-        <div class="tb-gender-switch">
-          <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
-        </div>
+        <div class="tb-guided-body" style="position:relative;max-height:none;overflow-y:auto">
+          <button class="tb-continue-btn tb-continue-corner${this.selectedRegionSlugs.size === 0 ? ' disabled' : ''}" data-action="guided-to-concerns" ${this.selectedRegionSlugs.size === 0 ? raw('disabled') : false}>
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
 
-        <div class="tb-card-grid">
-          ${uniqueRegions.map(region => {
-            const isSelected = this.selectedRegionSlugs.has(region.slug);
-            const icon = ICONS.regionCard[region.slug] || ICONS.cursor;
-            const concernCount = region.concerns.length;
+          <div class="tb-gender-switch" style="position:static;margin-bottom:8px">
+            <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
+          </div>
+
+          ${DISPLAY_GROUP_ORDER.filter(g => groups.has(g)).map(groupKey => {
+            const regions = groups.get(groupKey)!;
+            const label = DISPLAY_GROUP_LABELS[groupKey] || groupKey;
             return html`
-              <button
-                class="tb-region-card${isSelected ? ' selected' : ''}"
-                data-region-slug="${region.slug}"
-                style="${isSelected ? `border-color:${pc};--tb-card-accent:${pc}` : ''}"
-              >
-                <div class="tb-region-card-icon" style="${isSelected ? `color:${pc}` : ''}">${raw(icon)}</div>
-                <div class="tb-region-card-name">${region.name}</div>
-                ${concernCount > 0 ? html`<div class="tb-region-card-sub">${concernCount} concern${concernCount !== 1 ? 's' : ''}</div>` : false}
-                ${isSelected ? html`<div class="tb-region-card-check" style="background:${pc}">${raw(ICONS.check)}</div>` : false}
-              </button>
+              <div class="tb-card-section-label">${label}</div>
+              <div class="tb-card-grid">
+                ${regions.map(region => {
+                  const isSelected = this.selectedRegionSlugs.has(region.slug);
+                  const descriptor = (region as unknown as Record<string, unknown>).card_description as string || DEFAULT_CARD_DESCRIPTIONS[region.slug] || '';
+                  return html`
+                    <button
+                      class="tb-region-card${isSelected ? ' selected' : ''}"
+                      data-region-slug="${region.slug}"
+                    >
+                      <div class="tb-region-card-name">${region.name}</div>
+                      ${descriptor ? html`<div class="tb-region-card-sub">${descriptor}</div>` : false}
+                      ${isSelected ? html`<div class="tb-region-card-check">${raw(ICONS.check)}</div>` : false}
+                    </button>
+                  `;
+                })}
+              </div>
             `;
           })}
         </div>
-
-        ${this.selectedRegionSlugs.size > 0 ? html`
-          <div class="tb-guided-chips" style="margin-top:16px">
-            ${this.selectedRegions.map(r => html`
-              <span class="tb-chip">
-                ${r.name}
-                <button class="tb-chip-x" data-remove-region="${r.slug}">${raw(ICONS.x)}</button>
-              </span>
-            `)}
-          </div>
-        ` : false}
-
-        ${this.showConcerns || this.showServices ? html`
-          <div class="tb-card-panel">
-            ${this.renderPanel()}
-          </div>
-        ` : false}
-
-        ${!(this.showConcerns || this.showServices) && this.selectedRegionSlugs.size > 0 ? html`
-          <div style="padding:16px 0;text-align:center">
-            <button class="tb-continue-btn" data-action="continue">
-              Continue ${raw(ICONS.chevronRight)}
-            </button>
-          </div>
-        ` : false}
 
         ${this.renderFooter()}
       </div>
@@ -590,6 +637,9 @@ class TreatmentBuilderWidget extends HTMLElement {
         ${this.renderStepIndicator()}
 
         <div class="tb-guided-body">
+          <button class="tb-continue-btn tb-continue-corner${this.selectedRegionSlugs.size === 0 ? ' disabled' : ''}" data-action="guided-to-concerns" ${this.selectedRegionSlugs.size === 0 ? raw('disabled') : false}>
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
           ${this.diagramView === 'face' && !this.isFaceOnly
             ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
             : false}
@@ -612,24 +662,6 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           <div class="tb-gender-switch">
             <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
-          </div>
-
-          ${this.selectedRegionSlugs.size > 0 ? html`
-            <div class="tb-guided-chips">
-              ${this.selectedRegions.map(r => html`
-                <span class="tb-chip">
-                  ${r.name}
-                  <button class="tb-chip-x" data-remove-region="${r.slug}">${raw(ICONS.x)}</button>
-                </span>
-              `)}
-            </div>
-          ` : false}
-
-          <div class="tb-guided-nav">
-            <div></div>
-            <button class="tb-continue-btn${this.selectedRegionSlugs.size === 0 ? ' disabled' : ''}" data-action="guided-to-concerns" ${this.selectedRegionSlugs.size === 0 ? raw('disabled') : false}>
-              Continue ${raw(ICONS.chevronRight)}
-            </button>
           </div>
         </div>
 
@@ -1230,10 +1262,10 @@ class TreatmentBuilderWidget extends HTMLElement {
   // ── Footer ──
 
   private renderFooter(): SafeHTML {
+    if (!this.fullpage) return html``;
     return html`
       <div class="tb-footer">
         <span>Powered by Consult Intake</span>
-        <button data-action="reset-footer">${raw(ICONS.refresh)} Reset</button>
       </div>
     `;
   }
@@ -1380,7 +1412,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     const fields = this.config.form_fields;
 
     // System field_keys that map to top-level payload properties
-    const SYSTEM_KEYS = new Set(['first_name', 'last_name', 'email', 'phone']);
+    const SYSTEM_KEYS = new Set(['first_name', 'last_name', 'email', 'phone', 'date_of_birth']);
     const OPT_IN_KEYS = new Set(['sms_opt_in', 'email_opt_in']);
 
     // Validate required fields
@@ -1466,6 +1498,14 @@ class TreatmentBuilderWidget extends HTMLElement {
     // Location from form field overrides the data-attribute
     const formLocationId = (fd.get('location_id') as string || '').trim();
 
+    // Extract UTM parameters from the page URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const utmSource = urlParams.get('utm_source') || undefined;
+    const utmMedium = urlParams.get('utm_medium') || undefined;
+    const utmCampaign = urlParams.get('utm_campaign') || undefined;
+    const utmContent = urlParams.get('utm_content') || undefined;
+    const utmTerm = urlParams.get('utm_term') || undefined;
+
     const payload: Record<string, unknown> = {
       tenant_id: this.tenantId,
       location_id: formLocationId || this.locationId || undefined,
@@ -1473,12 +1513,20 @@ class TreatmentBuilderWidget extends HTMLElement {
       last_name: systemValues.last_name || '',
       email: systemValues.email || '',
       phone: systemValues.phone || undefined,
+      date_of_birth: systemValues.date_of_birth || undefined,
       gender: this.selectedGender as Gender,
       selected_regions: selectedRegions,
       selected_concerns: selectedConcerns,
       selected_services: selectedServices,
       custom_fields: customFields,
       source_url: window.location.href,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+      utm_content: utmContent,
+      utm_term: utmTerm,
+      sms_opt_in: optInValues.sms_opt_in || false,
+      email_opt_in: optInValues.email_opt_in || false,
     };
 
     // Include Treatment Builder data if in that mode

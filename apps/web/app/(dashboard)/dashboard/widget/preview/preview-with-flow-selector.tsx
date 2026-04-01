@@ -36,7 +36,7 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedLayout, setSelectedLayout] = useState<'split' | 'guided'>('split');
   const [selectedRegionStyle, setSelectedRegionStyle] = useState<RegionStyle>('diagram');
 
-  const previewUrl = `/widget/preview/${slug}?flow=${selectedFlow}&layout=${selectedLayout}`;
+  const previewUrl = `/widget/preview/${slug}?flow=${selectedFlow}&layout=${selectedLayout}&region_style=${selectedRegionStyle}`;
 
   const selectClass =
     'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400';

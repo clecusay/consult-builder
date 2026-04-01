@@ -122,9 +122,41 @@ export default function IntegrationSettingsPage() {
 
     try {
       const testPayload = formatWebhookPayload(config.webhook_format, {
-        event: 'test',
-        timestamp: new Date().toISOString(),
-        message: 'This is a test webhook from Consult Intake.',
+        event: 'submission.created',
+        submission: {
+          id: '00000000-0000-0000-0000-000000000000',
+          tenant_id: tenantId,
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: 'jane.doe@example.com',
+          phone: '(555) 555-1234',
+          date_of_birth: '1990-01-15',
+          location: 'Main Office',
+          location_id: null,
+          gender: 'female',
+          area_of_concern: 'Upper Face, Lips',
+          concerns: 'Wrinkles, Fine Lines, Lip Volume',
+          selected_regions: [
+            { region_id: '00000000-0000-0000-0000-000000000001', region_name: 'Upper Face', region_slug: 'upper-face' },
+            { region_id: '00000000-0000-0000-0000-000000000002', region_name: 'Lips', region_slug: 'lips' },
+          ],
+          selected_concerns: [
+            { concern_id: '00000000-0000-0000-0000-000000000003', concern_name: 'Wrinkles', region_id: '00000000-0000-0000-0000-000000000001', region_name: 'Upper Face' },
+            { concern_id: '00000000-0000-0000-0000-000000000004', concern_name: 'Fine Lines', region_id: '00000000-0000-0000-0000-000000000001', region_name: 'Upper Face' },
+            { concern_id: '00000000-0000-0000-0000-000000000005', concern_name: 'Lip Volume', region_id: '00000000-0000-0000-0000-000000000002', region_name: 'Lips' },
+          ],
+          selected_services: [],
+          custom_fields: {},
+          sms_opt_in: true,
+          email_opt_in: true,
+          source_url: 'https://example.com/treatments',
+          utm_source: 'google',
+          utm_medium: 'cpc',
+          utm_campaign: 'spring-promo',
+          utm_content: 'banner-ad',
+          utm_term: 'botox near me',
+          submitted_at: new Date().toISOString(),
+        },
       });
       const response = await fetch(config.webhook_url, {
         method: 'POST',

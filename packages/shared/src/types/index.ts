@@ -97,6 +97,8 @@ export interface BodyRegion {
   hotspot_x: number | null;
   hotspot_y: number | null;
   diagram_view: 'front' | 'back' | 'face' | null;
+  card_description: string | null;
+  display_group: 'face' | 'upper_body' | 'lower_body' | null;
   is_active: boolean;
   created_at: string;
 }
@@ -315,6 +317,8 @@ export interface WidgetRegion {
   hotspot_x: number | null;
   hotspot_y: number | null;
   diagram_view: 'front' | 'back' | 'face' | null;
+  card_description: string | null;
+  display_group: 'face' | 'upper_body' | 'lower_body' | null;
   concerns: WidgetConcern[];
 }
 

@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { sanitizeCSS } from '@/lib/sanitize-css';
-import type { WidgetConfigResponse, WidgetRegion, WidgetConcern } from '@treatment-builder/shared';
+import type { WidgetConfigResponse, WidgetRegion, WidgetConcern, WidgetMode } from '@treatment-builder/shared';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CACHE_ERROR = { 'Cache-Control': 'public, max-age=30' };
 
-const REGION_COLS = 'id, tenant_id, name, slug, gender, body_area, display_order, hotspot_x, hotspot_y, diagram_view, is_active';
+const REGION_COLS = 'id, tenant_id, name, slug, gender, body_area, display_order, hotspot_x, hotspot_y, diagram_view, is_active, card_description, display_group';
 const CONCERN_COLS = 'id, body_region_id, name, slug, description, display_order';
 
 /** Remove duplicate form fields — keeps the row with a field_key over one without. */
@@ -44,6 +44,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tenantId = searchParams.get('tenant_id');
   const locationId = searchParams.get('location');
+  const flowOverride = searchParams.get('flow');
+  const layoutOverride = searchParams.get('layout');
+  const regionStyleOverride = searchParams.get('region_style');
 
   if (!tenantId) {
     return NextResponse.json({ error: 'Missing tenant_id parameter' }, { status: 400, headers: CACHE_ERROR });
@@ -85,7 +88,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Widget not configured' }, { status: 404, headers: CACHE_ERROR });
   }
 
-  const widgetMode: string = config.widget_mode || 'regions_concerns';
+  const widgetMode = (flowOverride || config.widget_mode || 'regions_concerns') as WidgetMode;
   const modeIncludesServices = widgetMode.includes('services');
   const modeIncludesConcerns = widgetMode.includes('concerns');
 
@@ -290,6 +293,8 @@ export async function GET(request: Request) {
     hotspot_x: r.hotspot_x as number | null,
     hotspot_y: r.hotspot_y as number | null,
     diagram_view: r.diagram_view as 'front' | 'back' | 'face' | null,
+    card_description: r.card_description as string | null,
+    display_group: r.display_group as 'face' | 'upper_body' | 'lower_body' | null,
     concerns: concernsByRegion.get(r.id as string)
       || concernsByRegion.get(getEffectiveId(r as { id: string; slug: string; gender: string; tenant_id: string | null }))
       || [],
@@ -361,10 +366,10 @@ export async function GET(request: Request) {
       redirect_url: config.redirect_url,
       custom_css: config.custom_css ? sanitizeCSS(config.custom_css) : null,
     },
-    widget_mode: config.widget_mode || 'regions_concerns',
+    widget_mode: widgetMode,
     diagram_type: config.diagram_type || 'full_body',
-    region_style: config.region_style || 'diagram',
-    widget_layout: config.widget_layout || 'split',
+    region_style: regionStyleOverride || config.region_style || 'diagram',
+    widget_layout: layoutOverride || config.widget_layout || 'split',
     regions,
     service_categories: serviceCategories,
     form_fields: (formFields && formFields.length > 0) ? deduplicateFormFields(formFields) : DEFAULT_FORM_FIELDS,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { deliverWebhook } from '@/lib/webhooks/deliver';
 import { type WebhookFormat } from '@/lib/webhooks/format';
+import { sendNotificationEmails } from '@/lib/email/send-notification';
 import { rateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
@@ -12,6 +13,7 @@ const submissionSchema = z.object({
   last_name: z.string().min(1, 'Last name is required').max(100),
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
   phone: z.string().optional(),
+  date_of_birth: z.string().optional(),
   gender: z.enum(['female', 'male', 'all']),
   selected_regions: z.array(
     z.object({
@@ -39,6 +41,11 @@ const submissionSchema = z.object({
   sms_opt_in: z.boolean().optional(),
   email_opt_in: z.boolean().optional(),
   source_url: z.string().url().optional(),
+  utm_source: z.string().optional(),
+  utm_medium: z.string().optional(),
+  utm_campaign: z.string().optional(),
+  utm_content: z.string().optional(),
+  utm_term: z.string().optional(),
 });
 
 const submitLimiter = rateLimit({ limit: 10, windowMs: 60_000, keyPrefix: 'submit' });
@@ -84,7 +91,7 @@ export async function POST(request: Request) {
     // Verify tenant exists and is active
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('id, status')
+      .select('id, name, status')
       .eq('id', data.tenant_id)
       .eq('status', 'active')
       .single();
@@ -96,8 +103,8 @@ export async function POST(request: Request) {
     // Parallel: validate location + fetch webhook config (both need tenant.id)
     const [locationResult, configResult] = await Promise.all([
       data.location_id
-        ? supabase.from('tenant_locations').select('id').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
-        : Promise.resolve({ data: { id: '' }, error: null }),
+        ? supabase.from('tenant_locations').select('id, name, city, state').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
+        : Promise.resolve({ data: null, error: null }),
       supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails').eq('tenant_id', tenant.id).single(),
     ]);
 
@@ -151,12 +158,16 @@ export async function POST(request: Request) {
               submission: {
                 id: submission.id,
                 tenant_id: tenant.id,
-                location_id: data.location_id || null,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 email: data.email,
-                phone: data.phone,
+                phone: data.phone || null,
+                date_of_birth: data.date_of_birth || null,
+                location: locationResult.data ? locationResult.data.name : null,
+                location_id: data.location_id || null,
                 gender: data.gender,
+                area_of_concern: data.selected_regions.map(r => r.region_name).join(', '),
+                concerns: data.selected_concerns.map(c => c.concern_name).join(', '),
                 selected_regions: data.selected_regions,
                 selected_concerns: data.selected_concerns,
                 selected_services: data.selected_services,
@@ -164,6 +175,11 @@ export async function POST(request: Request) {
                 sms_opt_in: data.sms_opt_in,
                 email_opt_in: data.email_opt_in,
                 source_url: data.source_url,
+                utm_source: data.utm_source || null,
+                utm_medium: data.utm_medium || null,
+                utm_campaign: data.utm_campaign || null,
+                utm_content: data.utm_content || null,
+                utm_term: data.utm_term || null,
                 submitted_at: submission.created_at,
               },
             },
@@ -185,6 +201,31 @@ export async function POST(request: Request) {
             .eq('id', submission.id);
         }
       })();
+    }
+
+    // Send notification emails (non-blocking)
+    if (config?.notification_emails?.length) {
+      const locationName = locationResult.data ? locationResult.data.name : null;
+      sendNotificationEmails(
+        config.notification_emails,
+        tenant.name || 'Unknown',
+        {
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email,
+          phone: data.phone,
+          date_of_birth: data.date_of_birth,
+          location: locationName,
+          gender: data.gender,
+          area_of_concern: data.selected_regions.map(r => r.region_name).join(', '),
+          concerns: data.selected_concerns.map(c => c.concern_name).join(', '),
+          source_url: data.source_url,
+          utm_source: data.utm_source,
+          utm_medium: data.utm_medium,
+          utm_campaign: data.utm_campaign,
+          submitted_at: submission.created_at,
+        }
+      ).catch(err => console.error('Notification email error:', err));
     }
 
     return NextResponse.json(

@@ -85,6 +85,8 @@ export async function toggleBodyRegions(regionIds: string[], isActive: boolean) 
         hotspot_x: r.hotspot_x,
         hotspot_y: r.hotspot_y,
         diagram_view: r.diagram_view,
+        card_description: r.card_description,
+        display_group: r.display_group,
         is_active: isActive,
       }));
 
