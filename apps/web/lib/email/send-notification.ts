@@ -1,6 +1,10 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 interface SubmissionData {
   first_name: string;
@@ -67,7 +71,7 @@ export async function sendNotificationEmails(
 
   const results = await Promise.allSettled(
     notificationEmails.map((to) =>
-      resend.emails.send({
+      getResend().emails.send({
         from: 'Consult Intake <notifications@consultintake.com>',
         to,
         subject: `New Consultation: ${submission.first_name} ${submission.last_name}`,
