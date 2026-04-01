@@ -12,6 +12,13 @@ export default defineConfig({
     outDir: 'dist',
     cssCodeSplit: false, // Bundle CSS into JS
     minify: 'terser',
+    terserOptions: {
+      compress: {
+        passes: 3,
+        drop_console: true,
+      },
+    },
+    sourcemap: false,
     rollupOptions: {
       output: {
         inlineDynamicImports: true,

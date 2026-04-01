@@ -49,10 +49,11 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
 
   return (
     <>
+      <style dangerouslySetInnerHTML={{ __html: 'html,body{margin:0;padding:0;height:100%}#__next{height:100%}' }} />
       <div
-        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+        style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
         dangerouslySetInnerHTML={{
-          __html: `<treatment-builder ${attrs} style="flex:1;display:flex"></treatment-builder>`,
+          __html: `<treatment-builder ${attrs} style="flex:1;display:flex;flex-direction:column"></treatment-builder>`,
         }}
       />
       <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />

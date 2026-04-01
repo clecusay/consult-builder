@@ -26,13 +26,13 @@ function renderAnchor(
 
   const isSelected = anchor.regionSlugs.some(s => selectedSlugs.has(s));
   const r = HIGHLIGHT_RADII[anchor.id] || 120;
-  const circleR = isFace ? 55 : 45;
-  const labelX = anchor.labelSide === 'right' ? anchor.x + circleR + 20 : anchor.x - circleR - 20;
+  const circleR = isFace ? 75 : 60;
+  const labelX = anchor.labelSide === 'right' ? anchor.x + circleR + 25 : anchor.x - circleR - 25;
   const ta = anchor.labelSide === 'right' ? 'start' : 'end';
   const s = isSelected ? circleR * 0.85 : circleR * 0.75;
-  const hitR = Math.max(circleR + 20, 65);
-  const strokeW = isFace ? 5 : 4;
-  const fontSize = isFace ? 55 : 44;
+  const hitR = Math.max(circleR + 25, 85);
+  const strokeW = isFace ? 7 : 6;
+  const fontSize = isFace ? 70 : 58;
 
   return html`
     <g class="tb-anchor" data-anchor-slugs="${anchor.regionSlugs.join(',')}" style="cursor:pointer">
@@ -53,7 +53,7 @@ function renderAnchor(
       ${isSelected
         ? raw(`<svg x="${anchor.x - s / 2}" y="${anchor.y - s / 2}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`)
         : raw(`<svg x="${anchor.x - s / 2}" y="${anchor.y - s / 2}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${primaryColor}" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`)}
-      <text x="${labelX}" y="${anchor.y + 14}" text-anchor="${ta}" font-size="${fontSize}" font-weight="600" fill="#334155" opacity="0" class="tb-anchor-label">${anchor.label}</text>
+      <text x="${labelX}" y="${anchor.y + 14}" text-anchor="${ta}" font-size="${fontSize}" font-weight="600" fill="${isSelected ? primaryColor : '#334155'}" opacity="0" class="tb-anchor-label">${isSelected ? `${anchor.label} ✕` : anchor.label}</text>
       <circle cx="${anchor.x}" cy="${anchor.y}" r="${hitR}" fill="transparent"/>
     </g>`;
 }
@@ -78,7 +78,7 @@ export function renderBodySVG(
     : (isFemale ? FEMALE_BACK_ANCHORS : MALE_BACK_ANCHORS);
 
   return html`
-    <svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
+    <svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
       <defs><filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter></defs>
       <path d="${raw(silhouette)}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" filter="url(#tb-shadow)"/>
       ${anchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, false))}
@@ -99,7 +99,7 @@ export function renderFaceSVG(
   const facePath = isFemale ? FEMALE_FACE_PATH : MALE_FACE_PATH;
 
   return html`
-    <svg viewBox="${faceVB}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
+    <svg viewBox="${faceVB}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
       <defs>
         <filter id="tb-fshadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>
         <filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>

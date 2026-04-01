@@ -245,21 +245,99 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   private toggleConcern(id: string) {
-    if (this.selectedConcernIds.has(id)) this.selectedConcernIds.delete(id);
+    const wasSelected = this.selectedConcernIds.has(id);
+    if (wasSelected) this.selectedConcernIds.delete(id);
     else this.selectedConcernIds.add(id);
+
+    // Try targeted DOM update
+    const btn = this.shadow.querySelector<HTMLElement>(`[data-concern-id="${id}"]`);
+    if (btn) {
+      btn.classList.toggle('selected', !wasSelected);
+      const check = btn.querySelector('.tb-item-check');
+      if (check) {
+        check.classList.toggle('on', !wasSelected);
+        check.classList.toggle('off', wasSelected);
+        check.innerHTML = !wasSelected ? ICONS.check : '';
+      }
+      const name = btn.querySelector('.tb-item-name');
+      if (name) name.classList.toggle('selected', !wasSelected);
+      this.updateBadgeCounts();
+      return;
+    }
     this.render();
   }
 
   private toggleService(id: string) {
-    if (this.selectedServiceIds.has(id)) this.selectedServiceIds.delete(id);
+    const wasSelected = this.selectedServiceIds.has(id);
+    if (wasSelected) this.selectedServiceIds.delete(id);
     else this.selectedServiceIds.add(id);
+
+    // Try targeted DOM update
+    const btn = this.shadow.querySelector<HTMLElement>(`[data-service-id="${id}"]`);
+    if (btn) {
+      btn.classList.toggle('selected', !wasSelected);
+      const check = btn.querySelector('.tb-item-check');
+      if (check) {
+        check.classList.toggle('on', !wasSelected);
+        check.classList.toggle('off', wasSelected);
+        check.innerHTML = !wasSelected ? ICONS.check : '';
+      }
+      const name = btn.querySelector('.tb-item-name');
+      if (name) name.classList.toggle('selected', !wasSelected);
+      this.updateBadgeCounts();
+      return;
+    }
     this.render();
   }
 
   private toggleRegionExpanded(slug: string) {
-    if (this.expandedRegions.has(slug)) this.expandedRegions.delete(slug);
+    const wasExpanded = this.expandedRegions.has(slug);
+    if (wasExpanded) this.expandedRegions.delete(slug);
     else this.expandedRegions.add(slug);
+
+    // Try targeted DOM update (toggle classes, no rebuild)
+    const header = this.shadow.querySelector<HTMLElement>(`[data-toggle-region="${slug}"]`);
+    if (header) {
+      const concerns = header.nextElementSibling as HTMLElement | null;
+      const chevron = header.querySelector('.tb-region-chevron');
+      if (concerns) {
+        concerns.classList.toggle('expanded', !wasExpanded);
+        concerns.classList.toggle('collapsed', wasExpanded);
+      }
+      if (chevron) {
+        chevron.classList.toggle('expanded', !wasExpanded);
+        chevron.classList.toggle('collapsed', wasExpanded);
+      }
+      return;
+    }
     this.render();
+  }
+
+  /** Update badge counts and continue button without full re-render */
+  private updateBadgeCounts() {
+    // Update region badge counts
+    for (const region of this.selectedRegions) {
+      const count = region.concerns.filter(c => this.selectedConcernIds.has(c.id)).length;
+      const header = this.shadow.querySelector<HTMLElement>(`[data-toggle-region="${region.slug}"]`);
+      if (header) {
+        const badge = header.querySelector('.tb-region-badge');
+        if (badge) {
+          badge.textContent = count > 0 ? `${count} selected` : '';
+        } else if (count > 0) {
+          const span = document.createElement('span');
+          span.className = 'tb-region-badge';
+          span.textContent = `${count} selected`;
+          header.appendChild(span);
+        }
+      }
+    }
+    // Update continue button selection count
+    const total = this.totalSelections;
+    const continueBtn = this.shadow.querySelector<HTMLElement>('[data-action="continue"]');
+    if (continueBtn) {
+      const countText = total > 0 ? ` (${total})` : '';
+      continueBtn.innerHTML = `Continue${countText} ${ICONS.chevronRight}`;
+    }
   }
 
   private setGender(g: 'female' | 'male') {
@@ -304,20 +382,9 @@ class TreatmentBuilderWidget extends HTMLElement {
     const primary = branding.primary_color || '#e84393';
     const font = branding.font_family || '';
     const fullpageCss = this.fullpage
-      ? `:host{display:flex;height:100%;}
-.tb-root{border-radius:0 !important;box-shadow:none !important;flex:1;}
-.tb-split,.tb-guided-body,.tb-guided-concerns{max-height:none !important;flex:1;}
-.tb-header h2{font-size:20px;}
-.tb-header p{font-size:14px;}
-.tb-step-label{font-size:11px;}
-.tb-gender-btn{font-size:13px;}
-.tb-region-name,.tb-svc-cat-title,.tb-label,.tb-summary-text,.tb-optin-label span,.tb-region-card-sub{font-size:13px;}
-.tb-panel-empty-title{font-size:16px;}
-.tb-panel-empty-sub{font-size:14px;}
-.tb-item-btn,.tb-region-header,.tb-search-wrap input{font-size:14px;}
-.tb-continue-btn,.tb-back-btn,.tb-submit-btn{font-size:14px;}
-.tb-input,.tb-select{font-size:14px;}
-.tb-footer span,.tb-footer button{font-size:12px;}`
+      ? `:host{display:flex;flex-direction:column;height:100%;}
+.tb-root{border-radius:0 !important;box-shadow:none !important;flex:1;display:flex;flex-direction:column;min-height:0;}
+.tb-split,.tb-guided-body,.tb-guided-concerns{max-height:none !important;flex:1;min-height:0;}`
       : '';
     const cssVars = `:host{--tb-primary:${primary};${font ? `--tb-font:${font};` : ''}}`;
     const style = raw(`<style>${cssVars}${widgetStyles}${fullpageCss}</style>`);
@@ -397,9 +464,9 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         ${this.renderStepIndicator()}
 
-        <div class="tb-gender" style="margin-bottom:16px">
-          <button class="tb-gender-btn${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female">Female</button>
-          <button class="tb-gender-btn${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male">Male</button>
+        <div class="tb-gender-icons" style="margin-bottom:16px">
+          <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
+          <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
         </div>
 
         <div class="tb-card-grid">
@@ -488,9 +555,9 @@ class TreatmentBuilderWidget extends HTMLElement {
               ` : html`<div class="tb-rotate-spacer"></div>`}
             </div>
 
-            <div class="tb-gender">
-              <button class="tb-gender-btn${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female">Female</button>
-              <button class="tb-gender-btn${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male">Male</button>
+            <div class="tb-gender-icons tb-gender-bottom-left">
+              <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
+              <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
             </div>
           </div>
 
@@ -545,9 +612,9 @@ class TreatmentBuilderWidget extends HTMLElement {
             ` : html`<div class="tb-rotate-spacer"></div>`}
           </div>
 
-          <div class="tb-gender">
-            <button class="tb-gender-btn${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female">Female</button>
-            <button class="tb-gender-btn${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male">Male</button>
+          <div class="tb-gender-icons tb-gender-bottom-left">
+            <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
+            <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
           </div>
 
           ${this.selectedRegionSlugs.size > 0 ? html`

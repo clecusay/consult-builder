@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import Script from 'next/script';
 import type { WidgetMode, RegionStyle } from '@treatment-builder/shared';
 
 const FLOW_OPTIONS: { mode: WidgetMode; label: string }[] = [
@@ -36,36 +35,8 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
   const [selectedFlow, setSelectedFlow] = useState<WidgetMode>('regions_concerns');
   const [selectedLayout, setSelectedLayout] = useState<'split' | 'guided'>('split');
   const [selectedRegionStyle, setSelectedRegionStyle] = useState<RegionStyle>('diagram');
-  const [widgetKey, setWidgetKey] = useState(0);
-  const [ceReady, setCeReady] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Wait for the custom element to be defined
-  useEffect(() => {
-    if (customElements.get('treatment-builder')) {
-      setCeReady(true);
-      return;
-    }
-    customElements.whenDefined('treatment-builder').then(() => setCeReady(true));
-  }, []);
-
-  // Re-mount the widget when options change
-  useEffect(() => {
-    setWidgetKey((k) => k + 1);
-  }, [selectedFlow, selectedLayout, selectedRegionStyle]);
-
-  // Inject the widget element once CE is defined
-  useEffect(() => {
-    if (!ceReady) return;
-    const container = containerRef.current;
-    if (!container) return;
-    container.innerHTML = '';
-    const el = document.createElement('treatment-builder');
-    el.setAttribute('data-tenant-id', tenantId);
-    el.setAttribute('data-flow', selectedFlow);
-    el.setAttribute('data-layout', selectedLayout);
-    container.appendChild(el);
-  }, [widgetKey, ceReady, tenantId, selectedFlow, selectedLayout]);
+  const previewUrl = `/widget/preview/${slug}?flow=${selectedFlow}&layout=${selectedLayout}`;
 
   const selectClass =
     'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400';
@@ -149,15 +120,15 @@ export function PreviewWithFlowSelector({ tenantId, slug }: Props) {
           </div>
         </div>
 
-        {/* Live Widget Preview */}
-        <div
-          key={widgetKey}
-          ref={containerRef}
-          className="min-h-[500px] bg-white"
+        {/* Live Widget Preview via iframe */}
+        <iframe
+          key={`${selectedFlow}-${selectedLayout}-${selectedRegionStyle}`}
+          src={previewUrl}
+          className="w-full border-0"
+          style={{ minHeight: 600 }}
+          title="Widget Preview"
         />
       </Card>
-
-      <Script src="/widget.js" strategy="afterInteractive" />
     </div>
   );
 }

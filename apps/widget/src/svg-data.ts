@@ -11,12 +11,12 @@ export const FEMALE_ANCHORS: BodyAnchor[] = [
   { id: 'face', label: 'Face', x: 454, y: 120, labelSide: 'right', regionSlugs: ['upper-face', 'midface', 'lips', 'lower-face'] },
   { id: 'neck', label: 'Neck', x: 454, y: 422, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'chest', label: 'Chest', x: 613, y: 718, labelSide: 'right', regionSlugs: ['chest'] },
-  { id: 'arms', label: 'Arms', x: 123, y: 1174, labelSide: 'left', regionSlugs: ['arms'] },
+  { id: 'arms', label: 'Arms', x: 123, y: 1174, labelSide: 'right', regionSlugs: ['arms'] },
   { id: 'abdomen', label: 'Abdomen', x: 454, y: 1245, labelSide: 'right', regionSlugs: ['abdomen'] },
-  { id: 'flanks', label: 'Flanks', x: 191, y: 1030, labelSide: 'left', regionSlugs: ['flanks'] },
-  { id: 'hands', label: 'Hands', x: 45, y: 1796, labelSide: 'left', regionSlugs: ['hands'] },
+  { id: 'flanks', label: 'Flanks', x: 220, y: 1130, labelSide: 'left', regionSlugs: ['flanks'] },
+  { id: 'hands', label: 'Hands', x: 70, y: 1720, labelSide: 'left', regionSlugs: ['hands'] },
   { id: 'intimate', label: 'Intimate', x: 454, y: 1605, labelSide: 'right', regionSlugs: ['intimate'] },
-  { id: 'thighs', label: 'Thighs', x: 554, y: 2108, labelSide: 'right', regionSlugs: ['thighs'] },
+  { id: 'thighs', label: 'Thighs', x: 540, y: 1980, labelSide: 'right', regionSlugs: ['thighs'] },
   { id: 'lower-legs', label: 'Lower Legs', x: 354, y: 2682, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
@@ -24,18 +24,18 @@ export const MALE_ANCHORS: BodyAnchor[] = [
   { id: 'face', label: 'Face', x: 491, y: 106, labelSide: 'right', regionSlugs: ['upper-face', 'midface', 'lips', 'lower-face'] },
   { id: 'neck', label: 'Neck', x: 491, y: 394, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'chest', label: 'Chest', x: 678, y: 682, labelSide: 'right', regionSlugs: ['chest'] },
-  { id: 'arms', label: 'Arms', x: 108, y: 1094, labelSide: 'left', regionSlugs: ['arms'] },
+  { id: 'arms', label: 'Arms', x: 108, y: 1094, labelSide: 'right', regionSlugs: ['arms'] },
   { id: 'abdomen', label: 'Abdomen', x: 491, y: 1176, labelSide: 'right', regionSlugs: ['abdomen'] },
-  { id: 'flanks', label: 'Flanks', x: 187, y: 984, labelSide: 'left', regionSlugs: ['flanks'] },
-  { id: 'hands', label: 'Hands', x: 39, y: 1670, labelSide: 'left', regionSlugs: ['hands'] },
-  { id: 'thighs', label: 'Thighs', x: 614, y: 1958, labelSide: 'right', regionSlugs: ['thighs'] },
+  { id: 'flanks', label: 'Flanks', x: 215, y: 1080, labelSide: 'left', regionSlugs: ['flanks'] },
+  { id: 'hands', label: 'Hands', x: 65, y: 1600, labelSide: 'left', regionSlugs: ['hands'] },
+  { id: 'thighs', label: 'Thighs', x: 590, y: 1850, labelSide: 'right', regionSlugs: ['thighs'] },
   { id: 'lower-legs', label: 'Lower Legs', x: 368, y: 2496, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];
 
 export const FEMALE_BACK_ANCHORS: BodyAnchor[] = [
   { id: 'neck', label: 'Neck', x: 454, y: 422, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'back', label: 'Back', x: 454, y: 886, labelSide: 'right', regionSlugs: ['back'] },
-  { id: 'arms', label: 'Arms', x: 123, y: 1174, labelSide: 'left', regionSlugs: ['arms'] },
+  { id: 'arms', label: 'Arms', x: 123, y: 1174, labelSide: 'right', regionSlugs: ['arms'] },
   { id: 'buttocks', label: 'Buttocks', x: 454, y: 1581, labelSide: 'right', regionSlugs: ['buttocks'] },
   { id: 'thighs', label: 'Thighs', x: 554, y: 2108, labelSide: 'right', regionSlugs: ['thighs'] },
   { id: 'lower-legs', label: 'Lower Legs', x: 354, y: 2682, labelSide: 'left', regionSlugs: ['lower-legs'] },
@@ -44,7 +44,7 @@ export const FEMALE_BACK_ANCHORS: BodyAnchor[] = [
 export const MALE_BACK_ANCHORS: BodyAnchor[] = [
   { id: 'neck', label: 'Neck', x: 491, y: 394, labelSide: 'left', regionSlugs: ['neck'] },
   { id: 'back', label: 'Back', x: 491, y: 840, labelSide: 'right', regionSlugs: ['back'] },
-  { id: 'arms', label: 'Arms', x: 108, y: 1094, labelSide: 'left', regionSlugs: ['arms'] },
+  { id: 'arms', label: 'Arms', x: 108, y: 1094, labelSide: 'right', regionSlugs: ['arms'] },
   { id: 'buttocks', label: 'Buttocks', x: 491, y: 1488, labelSide: 'right', regionSlugs: ['buttocks'] },
   { id: 'thighs', label: 'Thighs', x: 614, y: 1958, labelSide: 'right', regionSlugs: ['thighs'] },
   { id: 'lower-legs', label: 'Lower Legs', x: 368, y: 2496, labelSide: 'left', regionSlugs: ['lower-legs'] },
@@ -58,10 +58,10 @@ export const FACE_ANCHORS: BodyAnchor[] = [
 ];
 
 export const HIGHLIGHT_RADII: Record<string, number> = {
-  face: 103, neck: 94, chest: 103, abdomen: 103, flanks: 103,
-  arms: 103, hands: 94, intimate: 103, back: 103, buttocks: 103,
-  thighs: 103, 'lower-legs': 103,
-  'upper-face': 186, midface: 186, lips: 171, 'lower-face': 171,
+  face: 120, neck: 110, chest: 120, abdomen: 120, flanks: 120,
+  arms: 120, hands: 110, intimate: 120, back: 120, buttocks: 120,
+  thighs: 120, 'lower-legs': 120,
+  'upper-face': 140, midface: 140, lips: 130, 'lower-face': 130,
 };
 
 // Viewboxes

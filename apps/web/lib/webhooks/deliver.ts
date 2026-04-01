@@ -1,4 +1,5 @@
 import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from './format';
+import { assertSafeUrl } from './validate-url';
 
 /**
  * Webhook delivery with HMAC-SHA256 signing.
@@ -10,6 +11,18 @@ export async function deliverWebhook(
   payload: Record<string, unknown>,
   format: WebhookFormat = 'generic'
 ): Promise<{ ok: boolean; status: number }> {
+  // SSRF protection: block requests to private/internal IPs
+  await assertSafeUrl(url);
+
+  // Enforce HTTPS in production (allow http://localhost for dev)
+  const parsed = new URL(url);
+  if (
+    parsed.protocol !== 'https:' &&
+    !(process.env.NODE_ENV === 'development' && parsed.hostname === 'localhost')
+  ) {
+    throw new Error('Webhook URL must use HTTPS');
+  }
+
   const formatted = formatWebhookPayload(format, payload);
   const body = JSON.stringify(formatted);
   const headers: Record<string, string> = {

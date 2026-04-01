@@ -347,7 +347,8 @@ export default function IntegrationSettingsPage() {
             Allowed Origins
           </CardTitle>
           <CardDescription>
-            Domains where your widget is allowed to load (CORS)
+            Domains where your widget is expected to load (for your reference
+            only — the widget uses permissive CORS to work on any website)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -383,8 +384,9 @@ export default function IntegrationSettingsPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Leave empty to allow all origins. Include the full origin with
-            protocol (e.g., https://example.com).
+            This list is for your records. The widget will function on any
+            domain. Include the full origin with protocol (e.g.,
+            https://example.com).
           </p>
         </CardContent>
       </Card>

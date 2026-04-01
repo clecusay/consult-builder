@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from '@/lib/webhooks/format';
+import { deliverWebhook } from '@/lib/webhooks/deliver';
+import { type WebhookFormat } from '@/lib/webhooks/format';
+import { rateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
 const submissionSchema = z.object({
@@ -39,14 +41,39 @@ const submissionSchema = z.object({
   source_url: z.string().url().optional(),
 });
 
+const submitLimiter = rateLimit({ limit: 10, windowMs: 60_000, keyPrefix: 'submit' });
+
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 submissions per minute per IP
+    const rl = submitLimiter(request);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Too many submissions. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const parsed = submissionSchema.safeParse(body);
 
     if (!parsed.success) {
+      console.warn('Submission validation failed:', JSON.stringify(parsed.error.flatten()));
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const safeErrors: Record<string, string> = {};
+      for (const [key, messages] of Object.entries(fieldErrors)) {
+        if (messages && messages.length > 0) {
+          safeErrors[key] = messages[0];
+        }
+      }
       return NextResponse.json(
-        { error: 'Invalid submission', details: parsed.error.flatten() },
+        { error: 'Please check your submission and try again.', fields: safeErrors },
         { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
@@ -66,25 +93,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
-    // Validate location belongs to tenant when provided
-    if (data.location_id) {
-      const { data: location } = await supabase
-        .from('tenant_locations')
-        .select('id')
-        .eq('id', data.location_id)
-        .eq('tenant_id', tenant.id)
-        .single();
-      if (!location) {
-        return NextResponse.json({ error: 'Location not found for this tenant' }, { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } });
-      }
+    // Parallel: validate location + fetch webhook config (both need tenant.id)
+    const [locationResult, configResult] = await Promise.all([
+      data.location_id
+        ? supabase.from('tenant_locations').select('id').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
+        : Promise.resolve({ data: { id: '' }, error: null }),
+      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails').eq('tenant_id', tenant.id).single(),
+    ]);
+
+    if (data.location_id && (locationResult.error || !locationResult.data)) {
+      return NextResponse.json({ error: 'Location not found for this tenant' }, { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
-    // Get widget config for webhook
-    const { data: config } = await supabase
-      .from('widget_configs')
-      .select('webhook_url, webhook_secret, webhook_format, notification_emails')
-      .eq('tenant_id', tenant.id)
-      .single();
+    const config = configResult.data;
 
     // Merge opt-in values into custom_fields for storage
     const customFields = { ...data.custom_fields };
@@ -120,27 +141,50 @@ export async function POST(request: Request) {
 
     // Fire webhook (non-blocking)
     if (config?.webhook_url) {
-      fireWebhook(supabase, submission.id, config.webhook_url, config.webhook_secret, (config.webhook_format as WebhookFormat) ?? 'generic', {
-        event: 'submission.created',
-        submission: {
-          id: submission.id,
-          tenant_id: tenant.id,
-          location_id: data.location_id || null,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          email: data.email,
-          phone: data.phone,
-          gender: data.gender,
-          selected_regions: data.selected_regions,
-          selected_concerns: data.selected_concerns,
-          selected_services: data.selected_services,
-          custom_fields: customFields,
-          sms_opt_in: data.sms_opt_in,
-          email_opt_in: data.email_opt_in,
-          source_url: data.source_url,
-          submitted_at: submission.created_at,
-        },
-      });
+      (async () => {
+        try {
+          const result = await deliverWebhook(
+            config.webhook_url,
+            config.webhook_secret,
+            {
+              event: 'submission.created',
+              submission: {
+                id: submission.id,
+                tenant_id: tenant.id,
+                location_id: data.location_id || null,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                email: data.email,
+                phone: data.phone,
+                gender: data.gender,
+                selected_regions: data.selected_regions,
+                selected_concerns: data.selected_concerns,
+                selected_services: data.selected_services,
+                custom_fields: customFields,
+                sms_opt_in: data.sms_opt_in,
+                email_opt_in: data.email_opt_in,
+                source_url: data.source_url,
+                submitted_at: submission.created_at,
+              },
+            },
+            (config.webhook_format as WebhookFormat) ?? 'generic'
+          );
+
+          await supabase
+            .from('form_submissions')
+            .update({
+              webhook_status: result.ok ? 'sent' : 'failed',
+              webhook_sent_at: new Date().toISOString(),
+            })
+            .eq('id', submission.id);
+        } catch (err) {
+          console.error('Webhook delivery failed:', err);
+          await supabase
+            .from('form_submissions')
+            .update({ webhook_status: 'failed' })
+            .eq('id', submission.id);
+        }
+      })();
     }
 
     return NextResponse.json(
@@ -164,59 +208,4 @@ export async function OPTIONS() {
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
-}
-
-// Fire webhook in background (don't await in request handler)
-async function fireWebhook(
-  supabase: Awaited<ReturnType<typeof createServiceRoleClient>>,
-  submissionId: string,
-  webhookUrl: string,
-  webhookSecret: string | null,
-  webhookFormat: WebhookFormat,
-  payload: Record<string, unknown>
-) {
-  try {
-    const formatted = formatWebhookPayload(webhookFormat, payload);
-    const body = JSON.stringify(formatted);
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (webhookSecret && !shouldSkipSigning(webhookFormat)) {
-      const encoder = new TextEncoder();
-      const key = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(webhookSecret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      );
-      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-      const hex = Array.from(new Uint8Array(signature))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-      headers['X-TB-Signature'] = `sha256=${hex}`;
-    }
-
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers,
-      body,
-      signal: AbortSignal.timeout(10000),
-    });
-
-    await supabase
-      .from('form_submissions')
-      .update({
-        webhook_status: res.ok ? 'sent' : 'failed',
-        webhook_sent_at: new Date().toISOString(),
-      })
-      .eq('id', submissionId);
-  } catch (err) {
-    console.error('Webhook delivery failed:', err);
-    await supabase
-      .from('form_submissions')
-      .update({ webhook_status: 'failed' })
-      .eq('id', submissionId);
-  }
 }

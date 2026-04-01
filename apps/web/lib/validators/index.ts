@@ -14,7 +14,25 @@ export const widgetConfigSchema = z.object({
   cta_text: z.string().max(100).optional(),
   success_message: z.string().max(500).optional(),
   redirect_url: z.string().url().nullable().optional(),
-  webhook_url: z.string().url().nullable().optional(),
+  webhook_url: z
+    .string()
+    .url()
+    .refine(
+      (url) => {
+        try {
+          const parsed = new URL(url);
+          return (
+            parsed.protocol === 'https:' ||
+            (process.env.NODE_ENV === 'development' && parsed.hostname === 'localhost')
+          );
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Webhook URL must use HTTPS' }
+    )
+    .nullable()
+    .optional(),
   webhook_secret: z.string().max(200).nullable().optional(),
   notification_emails: z.array(z.string().email()).optional(),
   allowed_origins: z.array(z.string().url()).optional(),

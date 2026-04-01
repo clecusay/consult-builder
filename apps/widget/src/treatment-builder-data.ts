@@ -70,11 +70,15 @@ const PAIN_POINTS_BY_REGION: Record<string, TBOption[]> = {
   'back': [
     { id: 'pp-back-fat', label: "Back fat shows through tops and bras" },
     { id: 'pp-back-rolls', label: "Rolls on my back make me self-conscious" },
+    { id: 'pp-bra-roll', label: "Bra roll or back fat is visible in fitted tops" },
+    { id: 'pp-back-acne', label: "Back acne or scarring makes me self-conscious" },
   ],
   'buttocks': [
     { id: 'pp-flat-butt', label: "I feel my buttocks are flat or shapeless" },
     { id: 'pp-butt-clothes', label: "I can't find clothes that fit the way I want" },
     { id: 'pp-butt-sagging', label: "Sagging in this area bothers me" },
+    { id: 'pp-butt-augment', label: "I wish I had more shape and volume" },
+    { id: 'pp-butt-contour', label: "I want better contouring and definition" },
   ],
   'thighs': [
     { id: 'pp-thigh-rub', label: "Inner thigh chafing or rubbing is uncomfortable" },
@@ -92,6 +96,7 @@ const PAIN_POINTS_BY_REGION: Record<string, TBOption[]> = {
   'intimate': [
     { id: 'pp-intimate-discomfort', label: "I experience physical discomfort" },
     { id: 'pp-intimate-confidence', label: "It affects my confidence and intimacy" },
+    { id: 'pp-intimate-appearance', label: "I'm self-conscious about the appearance of this area" },
   ],
 };
 
@@ -145,10 +150,12 @@ const OUTCOMES_BY_REGION: Record<string, TBOption[]> = {
   ],
   'back': [
     { id: 'out-smooth-back', label: "Feel confident in backless or fitted tops" },
+    { id: 'out-back-clear', label: "Have clear, smooth skin on my back" },
   ],
   'buttocks': [
     { id: 'out-butt-shape', label: "Love the shape and contour of my figure" },
     { id: 'out-butt-clothes-fit', label: "Have clothes fit and look great" },
+    { id: 'out-butt-volume', label: "Have the shape and volume I want" },
   ],
   'thighs': [
     { id: 'out-thigh-smooth', label: "Have smoother, more contoured thighs" },
@@ -162,6 +169,7 @@ const OUTCOMES_BY_REGION: Record<string, TBOption[]> = {
   ],
   'intimate': [
     { id: 'out-intimate-comfort', label: "Feel comfortable and confident again" },
+    { id: 'out-intimate-appearance', label: "Feel confident in my appearance and comfort" },
   ],
 };
 

@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ flow?: string; layout?: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -22,8 +23,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function WidgetStandalonePreview({ params }: Props) {
+export default async function WidgetStandalonePreview({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { flow, layout } = await searchParams;
 
   const supabase = await createServiceRoleClient();
   const { data: tenant } = await supabase
@@ -46,7 +48,7 @@ export default async function WidgetStandalonePreview({ params }: Props) {
       <div className="mx-auto max-w-[800px] px-5 py-10">
         <div
           dangerouslySetInnerHTML={{
-            __html: `<treatment-builder data-tenant-id="${tenant.id}"></treatment-builder>`,
+            __html: `<treatment-builder data-tenant-id="${tenant.id}"${flow ? ` data-flow="${flow}"` : ''}${layout ? ` data-layout="${layout}"` : ''}></treatment-builder>`,
           }}
         />
       </div>
