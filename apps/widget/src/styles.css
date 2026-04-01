@@ -220,79 +220,70 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 9999px;
   border: 1px solid #e2e8f0;
   background: #fff;
   color: #64748b;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s ease;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .tb-rotate-btn:hover {
   border-color: #cbd5e1;
   color: #334155;
   background: #f8fafc;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .tb-rotate-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .tb-rotate-spacer {
-  width: 40px;
+  width: 90px;
   flex-shrink: 0;
 }
 
 
 /* --- Gender Toggle --- */
 
-.tb-gender-icons {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.tb-gender-bottom-left {
+.tb-gender-switch {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 10px;
+  right: 10px;
 }
 
-.tb-gender-icon {
+.tb-gender-switch-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid #e2e8f0;
+  gap: 5px;
   background: #fff;
-  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 9999px;
   transition: all 0.15s ease;
-  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-.tb-gender-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.tb-gender-icon.active {
-  background: var(--tb-primary, #e84393);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--tb-primary, #e84393) 25%, transparent);
-}
-
-.tb-gender-icon:not(.active):hover {
-  border-color: #cbd5e1;
-  color: #475569;
-  background: #f8fafc;
+.tb-gender-switch-btn:hover {
+  color: var(--tb-primary, #e84393);
+  border-color: var(--tb-primary, #e84393);
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 /* --- Panel: Empty State --- */

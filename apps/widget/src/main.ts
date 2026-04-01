@@ -464,9 +464,8 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         ${this.renderStepIndicator()}
 
-        <div class="tb-gender-icons" style="margin-bottom:16px">
-          <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
-          <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
+        <div class="tb-gender-switch">
+          <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
         </div>
 
         <div class="tb-card-grid">
@@ -541,7 +540,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
             <div class="tb-diagram-row">
               ${this.diagramView === 'body' ? html`
-                <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)}</button>
+                <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
               ` : html`<div class="tb-rotate-spacer"></div>`}
 
               <div class="tb-diagram-wrap">
@@ -551,13 +550,12 @@ class TreatmentBuilderWidget extends HTMLElement {
               </div>
 
               ${this.diagramView === 'body' ? html`
-                <button class="tb-rotate-btn" data-side="back" title="Back">${raw(ICONS.rotateCw)}</button>
+                <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
               ` : html`<div class="tb-rotate-spacer"></div>`}
             </div>
 
-            <div class="tb-gender-icons tb-gender-bottom-left">
-              <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
-              <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
+            <div class="tb-gender-switch">
+              <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
             </div>
           </div>
 
@@ -598,7 +596,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           <div class="tb-diagram-row">
             ${this.diagramView === 'body' ? html`
-              <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)}</button>
+              <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
             ` : html`<div class="tb-rotate-spacer"></div>`}
 
             <div class="tb-guided-diagram">
@@ -608,13 +606,12 @@ class TreatmentBuilderWidget extends HTMLElement {
             </div>
 
             ${this.diagramView === 'body' ? html`
-              <button class="tb-rotate-btn" data-side="back" title="Back">${raw(ICONS.rotateCw)}</button>
+              <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
             ` : html`<div class="tb-rotate-spacer"></div>`}
           </div>
 
-          <div class="tb-gender-icons tb-gender-bottom-left">
-            <button class="tb-gender-icon${this.selectedGender === 'female' ? ' active' : ''}" data-gender="female" title="Female">${raw(ICONS.female)}</button>
-            <button class="tb-gender-icon${this.selectedGender === 'male' ? ' active' : ''}" data-gender="male" title="Male">${raw(ICONS.male)}</button>
+          <div class="tb-gender-switch">
+            <button class="tb-gender-switch-btn" data-gender="${this.selectedGender === 'female' ? 'male' : 'female'}">Switch to ${this.selectedGender === 'female' ? 'Male' : 'Female'}</button>
           </div>
 
           ${this.selectedRegionSlugs.size > 0 ? html`

@@ -3,7 +3,7 @@ import {
   HIGHLIGHT_RADII,
   FEMALE_ANCHORS, MALE_ANCHORS,
   FEMALE_BACK_ANCHORS, MALE_BACK_ANCHORS,
-  FACE_ANCHORS,
+  FEMALE_FACE_ANCHORS, MALE_FACE_ANCHORS,
   FEMALE_BODY_VB, MALE_BODY_VB, FEMALE_FACE_VB, MALE_FACE_VB,
   FEMALE_SILHOUETTE_PATH, MALE_SILHOUETTE_PATH,
   FEMALE_BACK_SILHOUETTE_PATH, MALE_BACK_SILHOUETTE_PATH,
@@ -26,13 +26,13 @@ function renderAnchor(
 
   const isSelected = anchor.regionSlugs.some(s => selectedSlugs.has(s));
   const r = HIGHLIGHT_RADII[anchor.id] || 120;
-  const circleR = isFace ? 75 : 60;
-  const labelX = anchor.labelSide === 'right' ? anchor.x + circleR + 25 : anchor.x - circleR - 25;
+  const circleR = isFace ? 50 : 60;
+  const labelX = anchor.labelSide === 'right' ? anchor.x + circleR + 20 : anchor.x - circleR - 20;
   const ta = anchor.labelSide === 'right' ? 'start' : 'end';
   const s = isSelected ? circleR * 0.85 : circleR * 0.75;
-  const hitR = Math.max(circleR + 25, 85);
-  const strokeW = isFace ? 7 : 6;
-  const fontSize = isFace ? 70 : 58;
+  const hitR = Math.max(circleR + 20, 70);
+  const strokeW = isFace ? 5 : 6;
+  const fontSize = isFace ? 50 : 58;
 
   return html`
     <g class="tb-anchor" data-anchor-slugs="${anchor.regionSlugs.join(',')}" style="cursor:pointer">
@@ -97,6 +97,7 @@ export function renderFaceSVG(
   const isFemale = gender === 'female';
   const faceVB = isFemale ? FEMALE_FACE_VB : MALE_FACE_VB;
   const facePath = isFemale ? FEMALE_FACE_PATH : MALE_FACE_PATH;
+  const faceAnchors = isFemale ? FEMALE_FACE_ANCHORS : MALE_FACE_ANCHORS;
 
   return html`
     <svg viewBox="${faceVB}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
@@ -108,7 +109,7 @@ export function renderFaceSVG(
       ${FACE_ZONE_LINES.map(line =>
         html`<line x1="272" y1="${line.y}" x2="1280" y2="${line.y}" stroke="#e2e8f0" stroke-width="4" stroke-dasharray="16 12"/>`
       )}
-      ${FACE_ANCHORS.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, true))}
+      ${faceAnchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, true))}
       ${raw('<style>.tb-anchor:hover .tb-anchor-label{opacity:1!important}</style>')}
     </svg>`;
 }
