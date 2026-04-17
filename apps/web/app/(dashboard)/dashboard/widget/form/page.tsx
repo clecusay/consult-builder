@@ -41,7 +41,7 @@ interface CustomField {
 }
 
 /** field_keys that are always present (managed outside presets/custom) */
-const SYSTEM_FIELD_KEYS = new Set(['first_name', 'last_name', 'email', 'sms_opt_in', 'email_opt_in']);
+const SYSTEM_FIELD_KEYS = new Set(['first_name', 'last_name', 'email', 'sms_opt_in', 'email_opt_in', 'communication_opt_in']);
 const PRESET_FIELD_KEYS = new Set(['phone', 'date_of_birth', 'procedure']);
 
 interface PresetField {
@@ -320,8 +320,7 @@ export default function FormFieldsPage() {
     }
 
     // ── 4. Opt-in fields (always at the end) ──
-    allRows.push({ tenant_id: tenantId, field_key: 'sms_opt_in', label: 'SMS Opt-In', field_type: 'checkbox', placeholder: 'I agree to receive SMS text messages with appointment reminders, promotions, and special offers. Message & data rates may apply. Reply STOP to unsubscribe.', is_required: false, display_order: 100, options: null });
-    allRows.push({ tenant_id: tenantId, field_key: 'email_opt_in', label: 'Email Opt-In', field_type: 'checkbox', placeholder: 'I would like to receive email updates including exclusive promotions, new treatment announcements, and helpful skincare tips. Unsubscribe anytime.', is_required: false, display_order: 101, options: null });
+    allRows.push({ tenant_id: tenantId, field_key: 'communication_opt_in', label: 'Communication Opt-In', field_type: 'checkbox', placeholder: 'I agree to receive communications including appointment reminders, promotions, and special offers via email and SMS. Message & data rates may apply. Unsubscribe anytime.', is_required: false, display_order: 100, options: null });
 
     await supabase.from('form_fields').insert(allRows);
 

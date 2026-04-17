@@ -69,6 +69,10 @@ export interface WidgetConfig {
   logo_url: string | null;
   cta_text: string;
   success_message: string;
+  success_heading: string;
+  success_action_url: string | null;
+  success_action_type: 'button' | 'embed' | null;
+  success_action_label: string;
   redirect_url: string | null;
   webhook_url: string | null;
   webhook_secret: string | null;
@@ -269,6 +273,10 @@ export interface WidgetConfigResponse {
     font_family: string;
     cta_text: string;
     success_message: string;
+    success_heading: string;
+    success_action_url: string | null;
+    success_action_type: 'button' | 'embed' | null;
+    success_action_label: string;
     redirect_url: string | null;
     custom_css: string | null;
   };

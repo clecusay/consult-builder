@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       .single(),
     supabase
       .from('widget_configs')
-      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout')
+      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, success_heading, success_action_url, success_action_type, success_action_label, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout')
       .eq('tenant_id', tenantId)
       .single(),
   ]);
@@ -363,6 +363,10 @@ export async function GET(request: Request) {
       font_family: config.font_family,
       cta_text: config.cta_text,
       success_message: config.success_message,
+      success_heading: config.success_heading || 'Thank You!',
+      success_action_url: config.success_action_url || null,
+      success_action_type: config.success_action_type || null,
+      success_action_label: config.success_action_label || 'Schedule Now',
       redirect_url: config.redirect_url,
       custom_css: config.custom_css ? sanitizeCSS(config.custom_css) : null,
     },

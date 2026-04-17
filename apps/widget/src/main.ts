@@ -588,9 +588,9 @@ class TreatmentBuilderWidget extends HTMLElement {
             <div class="tb-diagram-row">
               ${this.diagramView === 'body' ? html`
                 <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
-              ` : html`<div class="tb-rotate-spacer"></div>`}
+              ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
 
-              <div class="tb-diagram-wrap">
+              <div class="tb-diagram-wrap${this.isFaceOnly ? ' tb-face-only' : ''}">
                 ${this.diagramView === 'body'
                   ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
                   : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
@@ -598,7 +598,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
               ${this.diagramView === 'body' ? html`
                 <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
-              ` : html`<div class="tb-rotate-spacer"></div>`}
+              ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
             </div>
 
             <div class="tb-gender-switch">
@@ -647,9 +647,9 @@ class TreatmentBuilderWidget extends HTMLElement {
           <div class="tb-diagram-row">
             ${this.diagramView === 'body' ? html`
               <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
-            ` : html`<div class="tb-rotate-spacer"></div>`}
+            ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
 
-            <div class="tb-guided-diagram">
+            <div class="tb-guided-diagram${this.isFaceOnly ? ' tb-face-only' : ''}">
               ${this.diagramView === 'body'
                 ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
                 : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
@@ -657,7 +657,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
             ${this.diagramView === 'body' ? html`
               <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
-            ` : html`<div class="tb-rotate-spacer"></div>`}
+            ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
           </div>
 
           <div class="tb-gender-switch">
@@ -1246,12 +1246,31 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private renderSuccess(): SafeHTML {
     const cfg = this.config!;
+    const b = cfg.branding;
+    const actionUrl = b.success_action_url;
+    const actionType = b.success_action_type;
+    const actionLabel = b.success_action_label || 'Schedule Now';
+    const pc = this.primaryColor;
+
     return html`
       <div class="tb-root">
         <div class="tb-success">
           <div class="tb-success-icon">${raw(ICONS.check)}</div>
-          <h2>Thank You!</h2>
-          <p>${cfg.branding.success_message || "Thank you for your interest! We'll be in touch shortly with personalized recommendations."}</p>
+          <h2>${b.success_heading || 'Thank You!'}</h2>
+          <p>${b.success_message || "Thank you for your interest! We'll be in touch shortly with personalized recommendations."}</p>
+
+          ${actionUrl && actionType === 'button' ? html`
+            <a class="tb-success-cta" href="${actionUrl}" target="_blank" rel="noopener noreferrer" style="background:${pc}">
+              ${actionLabel}
+            </a>
+          ` : false}
+
+          ${actionUrl && actionType === 'embed' ? html`
+            <div class="tb-success-embed">
+              <iframe src="${actionUrl}" frameborder="0" style="width:100%;min-height:400px;border:none;border-radius:8px"></iframe>
+            </div>
+          ` : false}
+
           <button class="tb-reset-btn" data-action="reset">Start Over</button>
         </div>
         ${this.renderFooter()}
@@ -1413,7 +1432,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
     // System field_keys that map to top-level payload properties
     const SYSTEM_KEYS = new Set(['first_name', 'last_name', 'email', 'phone', 'date_of_birth']);
-    const OPT_IN_KEYS = new Set(['sms_opt_in', 'email_opt_in']);
+    const OPT_IN_KEYS = new Set(['sms_opt_in', 'email_opt_in', 'communication_opt_in']);
 
     // Validate required fields
     for (const field of fields) {
@@ -1525,8 +1544,8 @@ class TreatmentBuilderWidget extends HTMLElement {
       utm_campaign: utmCampaign,
       utm_content: utmContent,
       utm_term: utmTerm,
-      sms_opt_in: optInValues.sms_opt_in || false,
-      email_opt_in: optInValues.email_opt_in || false,
+      sms_opt_in: optInValues.communication_opt_in || optInValues.sms_opt_in || false,
+      email_opt_in: optInValues.communication_opt_in || optInValues.email_opt_in || false,
     };
 
     // Include Treatment Builder data if in that mode

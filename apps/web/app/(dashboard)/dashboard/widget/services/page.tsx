@@ -33,6 +33,7 @@ interface Treatment {
 const TREATMENT_LIBRARY: Treatment[] = [
   // ── Surgical — Face ──────────────────────────────────────────────
   { name: 'Facelift (Rhytidectomy)', description: 'Surgical lifting and tightening of facial tissues to reduce sagging and wrinkles', category: 'Surgical — Face' },
+  { name: 'Deep Plane Facelift', description: 'Advanced facelift technique that repositions deeper facial tissues for longer-lasting, natural-looking results', category: 'Surgical — Face' },
   { name: 'Brow Lift (Forehead Lift)', description: 'Raises the brow line to reduce forehead wrinkles and improve frown lines', category: 'Surgical — Face' },
   { name: 'Eyelid Surgery (Blepharoplasty)', description: 'Removes excess skin and fat from upper and/or lower eyelids', category: 'Surgical — Face' },
   { name: 'Rhinoplasty', description: 'Reshapes the nose for aesthetic or functional improvement', category: 'Surgical — Face' },
@@ -46,6 +47,7 @@ const TREATMENT_LIBRARY: Treatment[] = [
   { name: 'Fat Transfer to Face', description: 'Uses patient\'s own fat to restore facial volume', category: 'Surgical — Face' },
   { name: 'Facial Implants', description: 'Silicone implants to enhance chin, cheeks, or jawline', category: 'Surgical — Face' },
   { name: 'Buccal Fat Removal', description: 'Removes fat pads from the cheeks for a slimmer facial contour', category: 'Surgical — Face' },
+  { name: 'Reconstructive Surgery', description: 'Restores form and function to facial structures after trauma, cancer removal, or congenital conditions', category: 'Surgical — Face' },
 
   // ── Surgical — Breast ────────────────────────────────────────────
   { name: 'Breast Augmentation', description: 'Enhances breast size and shape with implants or fat transfer', category: 'Surgical — Breast' },

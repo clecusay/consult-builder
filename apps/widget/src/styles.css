@@ -886,6 +886,28 @@
   line-height: 1.6;
 }
 
+.tb-success-cta {
+  display: inline-block;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  margin-bottom: 16px;
+  transition: opacity 0.15s ease;
+}
+
+.tb-success-cta:hover {
+  opacity: 0.9;
+}
+
+.tb-success-embed {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto 16px;
+}
+
 .tb-reset-btn {
   padding: 8px 20px;
   border-radius: 8px;
@@ -998,6 +1020,21 @@
   width: 100%;
   height: auto;
   max-height: min(500px, 60vh);
+}
+
+/* Face-only: scale face diagram larger */
+.tb-guided-diagram.tb-face-only {
+  max-width: 520px;
+}
+
+.tb-guided-diagram.tb-face-only svg {
+  max-height: min(560px, 65vh);
+}
+
+.tb-diagram-wrap.tb-face-only svg {
+  max-width: 90%;
+  margin: 0 auto;
+  display: block;
 }
 
 .tb-guided-chips {

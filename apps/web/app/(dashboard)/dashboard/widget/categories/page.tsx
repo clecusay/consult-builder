@@ -32,10 +32,12 @@ const STANDARD_CATEGORIES: CategoryDef[] = [
     name: 'Surgical — Face',
     description: 'Cosmetic and reconstructive facial surgical procedures',
     treatments: [
-      'Facelift (Rhytidectomy)', 'Brow Lift (Forehead Lift)', 'Eyelid Surgery (Blepharoplasty)',
-      'Rhinoplasty', 'Revision Rhinoplasty', 'Septoplasty', 'Otoplasty (Ear Surgery)',
-      'Neck Lift', 'Chin Augmentation (Mentoplasty)', 'Cheek Augmentation', 'Lip Lift',
+      'Facelift (Rhytidectomy)', 'Deep Plane Facelift', 'Brow Lift (Forehead Lift)',
+      'Eyelid Surgery (Blepharoplasty)', 'Rhinoplasty', 'Revision Rhinoplasty',
+      'Septoplasty', 'Otoplasty (Ear Surgery)', 'Neck Lift',
+      'Chin Augmentation (Mentoplasty)', 'Cheek Augmentation', 'Lip Lift',
       'Fat Transfer to Face', 'Facial Implants', 'Buccal Fat Removal',
+      'Reconstructive Surgery',
     ],
   },
   {
