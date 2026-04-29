@@ -31,18 +31,18 @@ function renderAnchor(
   const ta = anchor.labelSide === 'right' ? 'start' : 'end';
   const s = isSelected ? circleR * 0.85 : circleR * 0.75;
   const hitR = Math.max(circleR + 20, 70);
-  const strokeW = isFace ? 5 : 6;
+  const strokeW = isFace ? 3 : 3;
   const fontSize = isFace ? 50 : 58;
 
   return html`
     <g class="tb-anchor" data-anchor-slugs="${anchor.regionSlugs.join(',')}" style="cursor:pointer">
       ${isSelected ? html`
-        <circle cx="${anchor.x}" cy="${anchor.y}" r="${r}" fill="${primaryColor}" opacity=".12"/>
-        <circle cx="${anchor.x}" cy="${anchor.y}" r="${r}" fill="none" stroke="${primaryColor}" stroke-width="5" opacity=".3"/>
+        <circle cx="${anchor.x}" cy="${anchor.y}" r="${r}" fill="${primaryColor}" opacity=".06"/>
+        <circle cx="${anchor.x}" cy="${anchor.y}" r="${r}" fill="none" stroke="${primaryColor}" stroke-width="2" opacity=".15"/>
       ` : false}
       ${!isSelected ? html`
-        <circle cx="${anchor.x}" cy="${anchor.y}" r="${circleR + 12}" fill="${primaryColor}" opacity=".08">
-          <animate attributeName="opacity" values=".08;.18;.08" dur="2.5s" repeatCount="indefinite"/>
+        <circle cx="${anchor.x}" cy="${anchor.y}" r="${circleR + 12}" fill="${primaryColor}" opacity=".05">
+          <animate attributeName="opacity" values=".05;.12;.05" dur="2.5s" repeatCount="indefinite"/>
         </circle>
       ` : false}
       <circle cx="${anchor.x}" cy="${anchor.y}" r="${circleR}"
@@ -79,8 +79,8 @@ export function renderBodySVG(
 
   return html`
     <svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
-      <defs><filter id="tb-shadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".06"/></filter></defs>
-      <path d="${raw(silhouette)}" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" filter="url(#tb-shadow)"/>
+      <defs><filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter></defs>
+      <path d="${raw(silhouette)}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" filter="url(#tb-shadow)"/>
       ${anchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, false))}
       ${raw('<style>.tb-anchor:hover .tb-anchor-label{opacity:1!important}</style>')}
     </svg>`;
@@ -102,10 +102,10 @@ export function renderFaceSVG(
   return html`
     <svg viewBox="${faceVB}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
       <defs>
-        <filter id="tb-fshadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".06"/></filter>
-        <filter id="tb-shadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".06"/></filter>
+        <filter id="tb-fshadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>
+        <filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>
       </defs>
-      <path d="${raw(facePath)}" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" filter="url(#tb-fshadow)"/>
+      <path d="${raw(facePath)}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" filter="url(#tb-fshadow)"/>
       ${FACE_ZONE_LINES.map(line =>
         html`<line x1="272" y1="${line.y}" x2="1280" y2="${line.y}" stroke="#e2e8f0" stroke-width="4" stroke-dasharray="16 12"/>`
       )}
