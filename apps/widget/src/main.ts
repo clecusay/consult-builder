@@ -558,7 +558,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         <div class="tb-header">
           ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
           <h2>${cfg.branding.cta_text || 'Build Your Consultation Plan'}</h2>
-          <p>Select the areas you'd like to address</p>
+          <p>Tell us your areas of interest and we'll help you build a personalized consultation plan. After you submit, our team will reach out to schedule your appointment.</p>
         </div>
 
         ${this.renderStepIndicator()}
@@ -611,7 +611,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         <div class="tb-header">
           ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
           <h2>${cfg.branding.cta_text || 'Build Your Consultation Plan'}</h2>
-          <p>Select the areas you'd like to address</p>
+          <p>Tell us your areas of interest and we'll help you build a personalized consultation plan. After you submit, our team will reach out to schedule your appointment.</p>
         </div>
 
         ${this.renderStepIndicator()}
@@ -668,7 +668,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         <div class="tb-header">
           ${cfg.tenant.logo_url ? html`<img src="${cfg.tenant.logo_url}" alt="${cfg.tenant.name}">` : false}
           <h2>${cfg.branding.cta_text || 'Build Your Consultation Plan'}</h2>
-          <p>Select the areas you'd like to address</p>
+          <p>Tell us your areas of interest and we'll help you build a personalized consultation plan. After you submit, our team will reach out to schedule your appointment.</p>
         </div>
 
         ${this.renderStepIndicator()}
@@ -1156,13 +1156,10 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           ${optInFields.length > 0 ? html`
             <div class="tb-optin">
-              <p class="tb-optin-title">Communication Preferences</p>
-              ${optInFields.map(field => html`
-                <label class="tb-optin-label">
-                  <input type="checkbox" name="${field.field_key || 'custom_' + field.id}"/>
-                  <span>${field.placeholder || field.label}</span>
-                </label>
-              `)}
+              <label class="tb-optin-label">
+                <input type="checkbox" name="communication_opt_in"/>
+                <span>I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime.</span>
+              </label>
             </div>
           ` : false}
 
@@ -1209,13 +1206,10 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           ${optInFields.length > 0 ? html`
             <div class="tb-optin">
-              <p class="tb-optin-title">Communication Preferences</p>
-              ${optInFields.map(field => html`
-                <label class="tb-optin-label">
-                  <input type="checkbox" name="${field.field_key || 'custom_' + field.id}"/>
-                  <span>${field.placeholder || field.label}</span>
-                </label>
-              `)}
+              <label class="tb-optin-label">
+                <input type="checkbox" name="communication_opt_in"/>
+                <span>I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime.</span>
+              </label>
             </div>
           ` : false}
 
@@ -1416,10 +1410,10 @@ class TreatmentBuilderWidget extends HTMLElement {
   // ── Footer ──
 
   private renderFooter(): SafeHTML {
-    if (!this.fullpage) return html``;
     return html`
       <div class="tb-footer">
-        <span>Powered by Consult Intake</span>
+        <button class="tb-exit-btn" data-action="exit-widget">Return to website</button>
+        ${this.fullpage ? html`<span class="tb-footer-powered">Powered by Consult Intake</span>` : false}
       </div>
     `;
   }
@@ -1477,6 +1471,14 @@ class TreatmentBuilderWidget extends HTMLElement {
           return;
         }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
+        if (action === 'exit-widget') {
+          if (this.fullpage) {
+            window.history.back();
+          } else {
+            this.dispatchEvent(new CustomEvent('tb-exit', { bubbles: true, composed: true }));
+          }
+          return;
+        }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }
 
         // Treatment Builder navigation
