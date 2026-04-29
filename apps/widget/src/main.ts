@@ -236,7 +236,11 @@ class TreatmentBuilderWidget extends HTMLElement {
   private get selectedRegions(): WidgetRegion[] {
     return this.genderRegions
       .filter(r => this.selectedRegionSlugs.has(r.slug))
-      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      .sort((a, b) => {
+        // Face regions first, then body
+        if (a.body_area !== b.body_area) return a.body_area === 'face' ? -1 : 1;
+        return (a.display_order ?? 0) - (b.display_order ?? 0);
+      });
   }
 
   private get concernsByRegion(): { regionName: string; regionSlug: string; concerns: (WidgetConcern & { regionSlug: string })[] }[] {

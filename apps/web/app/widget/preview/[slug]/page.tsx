@@ -66,7 +66,7 @@ export default async function WidgetStandalonePreview({ params, searchParams }: 
         />
       </div>
 
-      <Script src={"/widget.js"} strategy="lazyOnload" />
+      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
     </div>
   );
 }

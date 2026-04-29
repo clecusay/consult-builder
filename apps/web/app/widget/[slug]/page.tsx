@@ -55,7 +55,7 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
           __html: `<treatment-builder ${attrs} style="flex:1;display:flex;flex-direction:column"></treatment-builder>`,
         }}
       />
-      <Script src={"/widget.js"} strategy="lazyOnload" />
+      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
     </>
   );
 }
