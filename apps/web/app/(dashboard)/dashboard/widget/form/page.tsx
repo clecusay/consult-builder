@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
@@ -19,8 +19,6 @@ import {
   Lock,
   Plus,
   Trash2,
-  Loader2,
-  Save,
   Check,
   GripVertical,
   Phone,
@@ -28,6 +26,10 @@ import {
   Stethoscope,
   MapPin,
 } from 'lucide-react';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { getActiveServices } from '@/lib/queries/services';
 
 interface CustomField {
   id: string;
@@ -108,15 +110,13 @@ const defaultFields = [
 ];
 
 export default function FormFieldsPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [fields, setFields] = useState<CustomField[]>([]);
   const [procedureOptions, setProcedureOptions] = useState<string[]>([]);
   const [newProcedure, setNewProcedure] = useState('');
   const [activeServices, setActiveServices] = useState<ActiveService[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // Track which presets are enabled
   const [enabledPresets, setEnabledPresets] = useState<Record<string, boolean>>({
@@ -125,45 +125,22 @@ export default function FormFieldsPage() {
     procedure: false,
   });
 
-  const supabase = createClient();
-
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       // Fetch existing form fields
       const { data: existingFields } = await supabase
         .from('form_fields')
         .select('id, field_key, label, field_type, is_required, display_order, options')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .order('display_order', { ascending: true });
 
       // Fetch active services for this tenant
-      const { data: services } = await supabase
-        .from('services')
-        .select('id, name, category_id, service_categories(name)')
-        .eq('tenant_id', profile.tenant_id)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      const svcList: ActiveService[] = (services ?? []).map((s: Record<string, unknown>) => ({
-        id: s.id as string,
-        name: s.name as string,
-        category_name: (s.service_categories as Record<string, unknown> | null)?.name as string ?? 'Uncategorized',
-      }));
-      setActiveServices(svcList);
+      const svcList = await getActiveServices(supabase, tenantId!);
+      setActiveServices(svcList.map((s) => ({
+        ...s,
+        category_name: s.category_name ?? 'Uncategorized',
+      })));
 
       const allFields = (existingFields ?? []) as CustomField[];
 
@@ -207,11 +184,11 @@ export default function FormFieldsPage() {
       setSelectedServiceIds(savedServiceNames);
       setEnabledPresets(presetState);
       setFields(customOnly);
-      setLoading(false);
+      setDataLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   function toggleServiceOption(svc: ActiveService) {
     const next = new Set(selectedServiceIds);
@@ -275,11 +252,10 @@ export default function FormFieldsPage() {
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
 
     // Delete all existing form_fields for this tenant and re-insert
-    await supabase.from('form_fields').delete().eq('tenant_id', tenantId);
+    const { error: delError } = await supabase.from('form_fields').delete().eq('tenant_id', tenantId);
+    if (delError) throw new Error(delError.message);
 
     type FormFieldRow = {
       tenant_id: string;
@@ -322,42 +298,19 @@ export default function FormFieldsPage() {
     // ── 4. Opt-in fields (always at the end) ──
     allRows.push({ tenant_id: tenantId, field_key: 'communication_opt_in', label: 'Communication Opt-In', field_type: 'checkbox', placeholder: 'I agree to receive communications including appointment reminders, promotions, and special offers via email and SMS. Message & data rates may apply. Unsubscribe anytime.', is_required: false, display_order: 100, options: null });
 
-    await supabase.from('form_fields').insert(allRows);
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    const { error: insertError } = await supabase.from('form_fields').insert(allRows);
+    if (insertError) throw new Error(insertError.message);
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || dataLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Form Fields</h1>
-          <p className="text-muted-foreground">
-            Configure the consultation form in your widget
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Form Fields" description="Configure the consultation form in your widget">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Default Fields */}
       <Card>

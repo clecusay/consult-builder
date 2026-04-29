@@ -7,6 +7,7 @@ const csp = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src 'self'",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",

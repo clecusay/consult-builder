@@ -18,29 +18,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Users, UserPlus } from 'lucide-react';
-
-const roleStyles: Record<string, string> = {
-  platform_admin: 'bg-red-100 text-red-700',
-  center_admin: 'bg-blue-100 text-blue-700',
-  center_staff: 'bg-gray-100 text-gray-700',
-};
-
-const roleLabels: Record<string, string> = {
-  platform_admin: 'Platform Admin',
-  center_admin: 'Admin',
-  center_staff: 'Staff',
-};
+import { EmptyState } from '@/components/ui/empty-state';
+import { ROLE_STYLES, ROLE_LABELS } from '@/lib/constants/badge-styles';
 
 export default async function TeamPage() {
   const session = await requireSession();
   const supabase = await createServerSupabaseClient();
 
-  const { data: members } = await supabase
+  const { data: members, error } = await supabase
     .from('user_profiles')
     .select('id, user_id, full_name, role, created_at')
     .eq('tenant_id', session.profile.tenant_id)
     .order('created_at', { ascending: true });
 
+  if (error) console.error('[team] Query failed:', error);
   const allMembers = members ?? [];
 
   // Fetch emails for each member via auth users
@@ -99,9 +90,9 @@ export default async function TeamPage() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={roleStyles[member.role] ?? ''}
+                        className={ROLE_STYLES[member.role] ?? ''}
                       >
-                        {roleLabels[member.role] ?? member.role}
+                        {ROLE_LABELS[member.role] ?? member.role}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -112,16 +103,11 @@ export default async function TeamPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-              <Users className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="text-sm font-medium text-muted-foreground">
-                No team members
-              </h3>
-              <p className="mt-1 max-w-sm text-xs text-muted-foreground/70">
-                Invite team members to collaborate on managing your treatment
-                builder.
-              </p>
-            </div>
+            <EmptyState
+              icon={Users}
+              title="No team members"
+              description="Invite team members to collaborate on managing your treatment builder."
+            />
           )}
         </CardContent>
       </Card>

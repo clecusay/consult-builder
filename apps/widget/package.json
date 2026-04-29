@@ -10,7 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@treatment-builder/shared": "workspace:*"
+    "@treatment-builder/shared": "workspace:*",
+    "dompurify": "^3.2.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",

@@ -17,6 +17,8 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -100,6 +102,24 @@ export default function SignupPage() {
     setLoading(false);
   }
 
+  async function handleResend() {
+    setResending(true);
+    setResent(false);
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    setResending(false);
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setResent(true);
+    }
+  }
+
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -113,6 +133,20 @@ export default function SignupPage() {
               We sent a confirmation link to <strong className="text-slate-700">{email}</strong>. Please confirm your email to get started.
             </CardDescription>
           </CardHeader>
+          <CardContent className="text-center pb-2">
+            {resent ? (
+              <p className="text-sm text-green-600 font-medium">Confirmation email resent!</p>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResend}
+                disabled={resending}
+              >
+                {resending ? 'Sending...' : "Didn't get it? Resend email"}
+              </Button>
+            )}
+          </CardContent>
           <CardFooter className="justify-center pb-8">
             <Link
               href="/login"

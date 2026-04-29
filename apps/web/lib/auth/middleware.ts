@@ -48,7 +48,8 @@ export function withAuth(
         tenant_id: profile.tenant_id,
         role: profile.role as UserRole,
       });
-    } catch {
+    } catch (err) {
+      console.error('[withAuth] Unhandled error:', err);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   };

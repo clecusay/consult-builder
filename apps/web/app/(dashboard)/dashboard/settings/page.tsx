@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
@@ -12,7 +12,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Copy, Check, Building2, CreditCard } from 'lucide-react';
+import { Copy, Check, Building2, CreditCard } from 'lucide-react';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { TENANT_STATUS_STYLES, PLAN_STYLES } from '@/lib/constants/badge-styles';
 
 interface TenantInfo {
   id: string;
@@ -22,56 +25,30 @@ interface TenantInfo {
   billing_plan: string;
 }
 
-const statusStyles: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  inactive: 'bg-gray-100 text-gray-500',
-  suspended: 'bg-red-100 text-red-700',
-};
-
-const planStyles: Record<string, string> = {
-  free: 'bg-gray-100 text-gray-700',
-  starter: 'bg-blue-100 text-blue-700',
-  professional: 'bg-purple-100 text-purple-700',
-  enterprise: 'bg-amber-100 text-amber-700',
-};
-
 export default function SettingsPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [copiedSlug, setCopiedSlug] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
-  const supabase = createClient();
-
   useEffect(() => {
+    if (!tenantId) return;
     async function loadTenant() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-
       const { data: tenantData } = await supabase
         .from('tenants')
         .select('id, name, slug, status, billing_plan')
-        .eq('id', profile.tenant_id)
+        .eq('id', tenantId)
         .single();
 
       if (tenantData) {
         setTenant(tenantData);
       }
-      setLoading(false);
+      setDataLoading(false);
     }
 
     loadTenant();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   async function copyToClipboard(text: string, setter: (v: boolean) => void) {
     await navigator.clipboard.writeText(text);
@@ -79,12 +56,8 @@ export default function SettingsPage() {
     setTimeout(() => setter(false), 2000);
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || dataLoading) {
+    return <LoadingSpinner />;
   }
 
   if (!tenant) {
@@ -97,11 +70,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your center profile</p>
-      </div>
+      <PageHeader title="Settings" description="Manage your center profile" />
 
       {/* Center Profile */}
       <Card>
@@ -156,7 +125,7 @@ export default function SettingsPage() {
             <p className="text-sm font-medium text-muted-foreground">Status</p>
             <Badge
               variant="secondary"
-              className={statusStyles[tenant.status] ?? ''}
+              className={TENANT_STATUS_STYLES[tenant.status] ?? ''}
             >
               {tenant.status.charAt(0).toUpperCase() + tenant.status.slice(1)}
             </Badge>
@@ -172,7 +141,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2">
               <Badge
                 variant="secondary"
-                className={planStyles[tenant.billing_plan] ?? ''}
+                className={PLAN_STYLES[tenant.billing_plan] ?? ''}
               >
                 <CreditCard className="mr-1 h-3 w-3" />
                 {tenant.billing_plan.charAt(0).toUpperCase() +

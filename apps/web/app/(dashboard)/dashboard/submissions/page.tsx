@@ -8,19 +8,22 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Inbox } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SubmissionsTable } from './submissions-table';
 
 export default async function SubmissionsPage() {
   const session = await requireSession();
   const supabase = await createServerSupabaseClient();
 
-  const { data: submissions } = await supabase
+  const { data: submissions, error } = await supabase
     .from('form_submissions')
     .select(
       'id, first_name, last_name, email, phone, gender, selected_regions, selected_concerns, selected_services, custom_fields, lead_status, source_url, created_at'
     )
     .eq('tenant_id', session.profile.tenant_id)
     .order('created_at', { ascending: false });
+
+  if (error) console.error('[submissions] Query failed:', error);
 
   return (
     <div className="space-y-6">
@@ -45,16 +48,11 @@ export default async function SubmissionsPage() {
           {submissions && submissions.length > 0 ? (
             <SubmissionsTable submissions={submissions} />
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-              <Inbox className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="text-sm font-medium text-muted-foreground">
-                No submissions yet
-              </h3>
-              <p className="mt-1 max-w-sm text-xs text-muted-foreground/70">
-                Once your widget is embedded on your website and visitors start
-                submitting the form, their submissions will appear here.
-              </p>
-            </div>
+            <EmptyState
+              icon={Inbox}
+              title="No submissions yet"
+              description="Once your widget is embedded on your website and visitors start submitting the form, their submissions will appear here."
+            />
           )}
         </CardContent>
       </Card>

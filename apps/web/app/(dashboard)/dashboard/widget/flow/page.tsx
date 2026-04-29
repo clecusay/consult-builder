@@ -1,19 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
+import { updateWidgetConfig } from '@/lib/queries/widget-config';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Loader2,
-  Save,
-  Check,
   ArrowRight,
   MessageSquare,
   GitBranch,
@@ -21,6 +18,9 @@ import {
   Bone,
 } from 'lucide-react';
 import { logAuditClient } from '@/lib/audit/client';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type WidgetMode =
   | 'regions_services'
@@ -80,35 +80,18 @@ const regionStyleOptions: { value: RegionStyle; label: string; description: stri
 ];
 
 export default function WidgetFlowPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [selected, setSelected] = useState<WidgetMode>('regions_concerns');
   const [regionStyle, setRegionStyle] = useState<RegionStyle>('diagram');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const [configLoading, setConfigLoading] = useState(true);
 
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       const { data: config } = await supabase
         .from('widget_configs')
         .select('widget_mode, region_style')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .single();
 
       if (config?.widget_mode) {
@@ -117,25 +100,15 @@ export default function WidgetFlowPage() {
       if (config?.region_style) {
         setRegionStyle(config.region_style as RegionStyle);
       }
-      setLoading(false);
+      setConfigLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
-
-    await supabase
-      .from('widget_configs')
-      .update({ widget_mode: selected, region_style: regionStyle })
-      .eq('tenant_id', tenantId);
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    await updateWidgetConfig(supabase, tenantId, { widget_mode: selected, region_style: regionStyle });
 
     logAuditClient({
       action: 'widget_config.flow_updated',
@@ -144,35 +117,15 @@ export default function WidgetFlowPage() {
     });
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || configLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Widget Flow</h1>
-          <p className="text-muted-foreground">
-            Choose how visitors interact with your widget
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Widget Flow" description="Choose how visitors interact with your widget">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Flow selection cards */}
       <div className="grid gap-4 md:grid-cols-2">

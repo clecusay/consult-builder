@@ -1,24 +1,24 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
   CardHeader,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
-  Loader2,
-  Save,
-  Check,
   Stethoscope,
   Search,
+  Check,
   X,
 } from 'lucide-react';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ---------------------------------------------------------------------------
 // Standardized treatment library — platform-managed, not tenant-editable
@@ -223,12 +223,10 @@ function generateSlug(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function ServicesPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   // Set of treatment names (lowercase) the tenant has enabled
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
 
   // Search & filter
@@ -236,42 +234,32 @@ export default function ServicesPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'enabled' | 'disabled'>('all');
 
-  const supabase = createClient();
-
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id, tenants (slug)')
-        .eq('user_id', user.id)
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('slug')
+        .eq('id', tenantId)
         .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-      const tenant = (profile as Record<string, unknown>).tenants as { slug: string } | null;
       if (tenant) setTenantSlug(tenant.slug);
 
       // Load tenant's existing services — match by name to our standard list
       const { data: existingServices } = await supabase
         .from('services')
         .select('name, is_active')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true);
 
       const enabledNames = new Set(
         (existingServices ?? []).map((s) => s.name.toLowerCase())
       );
       setEnabled(enabledNames);
-      setLoading(false);
+      setDataLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   // ── Toggle ─────────────────────────────────────────────────────────
 
@@ -333,8 +321,6 @@ export default function ServicesPage() {
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
 
     // Delete existing services (cascades to service_body_regions)
     const { error: delServicesErr } = await supabase.from('services').delete().eq('tenant_id', tenantId);
@@ -351,9 +337,6 @@ export default function ServicesPage() {
     console.log('[services:save] enabled treatments:', enabledTreatments.length);
 
     if (enabledTreatments.length === 0) {
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
       return;
     }
 
@@ -460,9 +443,6 @@ export default function ServicesPage() {
     }
 
     console.log('[services:save] complete');
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   }
 
   // ── Filtered library ───────────────────────────────────────────────
@@ -503,37 +483,15 @@ export default function ServicesPage() {
 
   // ── Render ─────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || dataLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Services &amp; Procedures
-          </h1>
-          <p className="text-muted-foreground">
-            Select the treatments your practice offers from our standardized library
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Services & Procedures" description="Select the treatments your practice offers from our standardized library">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Summary bar */}
       <div className="flex items-center gap-3">

@@ -6,6 +6,10 @@ function getResend() {
   return _resend;
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
 interface SubmissionData {
   first_name: string;
   last_name: string;
@@ -48,7 +52,7 @@ export async function sendNotificationEmails(
   const tableRows = rows
     .map(
       (r) =>
-        `<tr><td style="padding:8px 12px;font-weight:600;color:#475569;white-space:nowrap;vertical-align:top">${r.label}</td><td style="padding:8px 12px;color:#1e293b">${r.value}</td></tr>`
+        `<tr><td style="padding:8px 12px;font-weight:600;color:#475569;white-space:nowrap;vertical-align:top">${escapeHtml(r.label)}</td><td style="padding:8px 12px;color:#1e293b">${escapeHtml(r.value)}</td></tr>`
     )
     .join('');
 
@@ -56,7 +60,7 @@ export async function sendNotificationEmails(
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto">
       <div style="background:#0f172a;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
         <h2 style="margin:0;font-size:18px;font-weight:600">New Consultation Request</h2>
-        <p style="margin:6px 0 0;font-size:13px;color:#94a3b8">${tenantName}</p>
+        <p style="margin:6px 0 0;font-size:13px;color:#94a3b8">${escapeHtml(tenantName)}</p>
       </div>
       <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:4px 0">
         <table style="width:100%;border-collapse:collapse;font-size:14px">

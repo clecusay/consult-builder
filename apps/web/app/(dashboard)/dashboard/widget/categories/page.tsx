@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
@@ -10,12 +10,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
-  Loader2,
   Tag,
   Stethoscope,
   CheckCircle2,
   Circle,
 } from 'lucide-react';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ---------------------------------------------------------------------------
 // Standardized categories — mirrors the treatment library on services page
@@ -152,40 +153,27 @@ const STANDARD_CATEGORIES: CategoryDef[] = [
 // ---------------------------------------------------------------------------
 
 export default function ServiceCategoriesPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [enabledServices, setEnabledServices] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-
-  const supabase = createClient();
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-
       const { data: services } = await supabase
         .from('services')
         .select('name')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true);
 
       setEnabledServices(
         new Set((services ?? []).map((s) => s.name.toLowerCase()))
       );
-      setLoading(false);
+      setDataLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   const totalEnabled = enabledServices.size;
   const totalTreatments = STANDARD_CATEGORIES.reduce(
@@ -193,25 +181,13 @@ export default function ServiceCategoriesPage() {
     0
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || dataLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Service Categories
-        </h1>
-        <p className="text-muted-foreground">
-          Standardized categories used across all practices for consistent reporting
-        </p>
-      </div>
+      <PageHeader title="Service Categories" description="Standardized categories used across all practices for consistent reporting" />
 
       {/* Summary */}
       <div className="flex items-center gap-3 flex-wrap">

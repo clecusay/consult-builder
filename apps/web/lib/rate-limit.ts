@@ -15,19 +15,27 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 
-// Periodic cleanup to prevent memory leaks (runs at most once per minute)
-let lastCleanup = Date.now();
+// Periodic cleanup to prevent memory leaks
+// Uses setInterval so cleanup runs regardless of request frequency
+const CLEANUP_INTERVAL_MS = 60_000;
+
 function cleanup() {
   const now = Date.now();
-  if (now - lastCleanup < 60_000) return;
-  lastCleanup = now;
   for (const [key, entry] of store) {
     if (now > entry.resetAt) store.delete(key);
   }
 }
 
+// Schedule cleanup on module load (safe in Node.js — persists across warm invocations)
+if (typeof setInterval !== 'undefined') {
+  const timer = setInterval(cleanup, CLEANUP_INTERVAL_MS);
+  // Allow process to exit without waiting for the timer
+  if (timer && typeof timer === 'object' && 'unref' in timer) {
+    timer.unref();
+  }
+}
+
 function increment(key: string, windowMs: number): RateLimitEntry {
-  cleanup();
   const now = Date.now();
   const entry = store.get(key);
   if (!entry || now > entry.resetAt) {

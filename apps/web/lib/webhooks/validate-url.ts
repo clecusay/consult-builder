@@ -16,7 +16,7 @@ const BLOCKED_IPV4_RANGES: Array<{ network: number; mask: number; label: string 
 ];
 
 /** IPv6 addresses/prefixes that must be blocked. */
-const BLOCKED_IPV6 = ['::1', 'fc00::', 'fd00::', 'fe80::'];
+const BLOCKED_IPV6 = ['::1', 'fc00::', 'fd00::', 'fe80::', '2001:db8::'];
 
 function ip4ToInt(ip: string): number {
   const parts = ip.split('.').map(Number);
@@ -62,7 +62,7 @@ export async function assertSafeUrl(url: string): Promise<void> {
 
   // Allow localhost in development only
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
-    if (process.env.NODE_ENV === 'development') return;
+    if (process.env.NODE_ENV === 'development' && !process.env.VERCEL) return;
     throw new Error('Blocked webhook URL: localhost is not allowed in production');
   }
 

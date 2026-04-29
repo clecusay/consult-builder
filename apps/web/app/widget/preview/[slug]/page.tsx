@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Script from 'next/script';
 import type { Metadata } from 'next';
 import { PreviewBanner } from './preview-banner';
+import { buildWidgetAttrs } from '@/lib/widget/build-attrs';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -38,14 +39,12 @@ export default async function WidgetStandalonePreview({ params, searchParams }: 
 
   if (!tenant) notFound();
 
-  const attrs = [
-    `data-tenant-id="${tenant.id}"`,
-    flow ? `data-flow="${flow}"` : '',
-    layout ? `data-layout="${layout}"` : '',
-    region_style ? `data-region-style="${region_style}"` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const attrs = buildWidgetAttrs({
+    tenantId: tenant.id,
+    flow,
+    layout,
+    regionStyle: region_style,
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' }}>
@@ -67,7 +66,7 @@ export default async function WidgetStandalonePreview({ params, searchParams }: 
         />
       </div>
 
-      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
+      <Script src={"/widget.js"} strategy="lazyOnload" />
     </div>
   );
 }

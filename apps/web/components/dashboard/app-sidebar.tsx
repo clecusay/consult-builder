@@ -20,6 +20,7 @@ import {
   Building2,
   Stethoscope,
   LayoutTemplate,
+  PartyPopper,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -56,6 +57,7 @@ export function AppSidebar({ role, tenantName }: AppSidebarProps) {
     { title: 'Regions', href: '/dashboard/widget/regions', icon: Layers },
     { title: 'Layout', href: '/dashboard/widget/layout', icon: LayoutTemplate },
     { title: 'Form Fields', href: '/dashboard/widget/form', icon: FormInput },
+    { title: 'Success Flow', href: '/dashboard/widget/success-flow', icon: PartyPopper },
     { title: 'Integration', href: '/dashboard/widget/integration', icon: Webhook },
     { title: 'Preview', href: '/dashboard/widget/preview', icon: Eye },
     { title: 'Embed Code', href: '/dashboard/widget/embed', icon: Code },

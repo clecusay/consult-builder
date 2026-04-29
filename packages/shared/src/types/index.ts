@@ -83,8 +83,36 @@ export interface WidgetConfig {
   diagram_type: DiagramType;
   region_style: RegionStyle;
   widget_layout: WidgetLayout;
+  success_flow_config: SuccessFlowConfig | null;
   created_at: string;
   updated_at: string;
+}
+
+// --- Success Flow Config ---
+export interface SuccessFlowThankYou {
+  enabled: boolean;
+  heading: string;
+  body: string;
+}
+
+export interface SuccessFlowDoctorProfile {
+  enabled: boolean;
+  heading: string;
+  body: string;
+  doctor_name: string;
+}
+
+export interface SuccessFlowCalendar {
+  enabled: boolean;
+  heading: string;
+  calendar_url: string;
+  calendar_embed_type: 'iframe' | 'button';
+}
+
+export interface SuccessFlowConfig {
+  thank_you: SuccessFlowThankYou;
+  doctor_profile: SuccessFlowDoctorProfile;
+  calendar: SuccessFlowCalendar;
 }
 
 // --- Body Region ---
@@ -121,6 +149,7 @@ export interface Concern {
 }
 
 // --- Form Field ---
+// Keep in sync with: apps/web/lib/validators/index.ts → formFieldSchema.field_type
 export type FormFieldType = 'text' | 'email' | 'phone' | 'date' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'location';
 
 export interface FormField {
@@ -279,6 +308,7 @@ export interface WidgetConfigResponse {
     success_action_label: string;
     redirect_url: string | null;
     custom_css: string | null;
+    success_flow: SuccessFlowConfig;
   };
   widget_mode: WidgetMode;
   diagram_type: DiagramType;

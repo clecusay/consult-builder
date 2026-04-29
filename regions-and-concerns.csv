@@ -4,19 +4,26 @@ female,body,front,Abdomen,Excess Fat,excess-fat
 female,body,front,Abdomen,Muscle Tone,muscle-tone
 female,body,front,Abdomen,Stretch Marks,stretch-marks
 female,body,front,Abdomen,Uneven Skin Texture,uneven-skin-texture
+female,body,front,Abdomen,Tummy Tuck,tummy-tuck
+female,body,front,Abdomen,C-Section Scar,c-section-scar
+female,body,front,Abdomen,Liposuction,liposuction
 female,body,front,Arms,Upper Arm Laxity,upper-arm-laxity
 female,body,front,Arms,Loose Skin,loose-skin
 female,body,front,Arms,Excess Fat,excess-fat
 female,body,front,Arms,Hyperpigmentation,hyperpigmentation
-female,body,front,Chest,Breast Enhancement,breast-enhancement
-female,body,front,Chest,Micromastia,micromastia
-female,body,front,Chest,Loose Skin,loose-skin
-female,body,front,Chest,Enlarged Areolas,enlarged-areolas
-female,body,front,Chest,Acne,acne
-female,body,front,Chest,Hyperpigmentation,hyperpigmentation
-female,body,front,Chest,Breast Asymmetry,breast-asymmetry
+female,body,front,Breasts,Breast Enhancement,breast-enhancement
+female,body,front,Breasts,Loose Skin,loose-skin
+female,body,front,Breasts,Enlarged Areolas,enlarged-areolas
+female,body,front,Breasts,Breast Asymmetry,breast-asymmetry
+female,body,front,Breasts,Sagging Breasts,sagging-breasts
+female,body,front,Breasts,Breast Reduction,breast-reduction
+female,body,front,Breasts,Implant Exchange,implant-exchange
+female,body,front,Breasts,Breast Removal / Top Surgery,breast-removal-top-surgery
 female,body,front,Flanks,Excess Fat,excess-fat
 female,body,front,Flanks,Loose Skin,loose-skin
+female,body,front,Flanks,Rib Contouring,rib-contouring
+female,body,front,Flanks,Waist Shaping,waist-shaping
+female,body,front,Flanks,Contouring,contouring
 female,body,front,Hands,Hyperpigmentation,hyperpigmentation
 female,body,front,Hands,Dry Skin,dry-skin
 female,body,front,Hands,Fine Lines,fine-lines
@@ -50,24 +57,24 @@ female,body,back,Buttocks,Contouring,contouring
 female,face,face,Upper Face,Wrinkles,wrinkles
 female,face,face,Upper Face,Crow's Feet,crows-feet
 female,face,face,Upper Face,Frown Lines,frown-lines
-female,face,face,Upper Face,Hooded Eyelids,hooded-eyelids
-female,face,face,Upper Face,Puffy Eyes,puffy-eyes
 female,face,face,Upper Face,Fine Lines,fine-lines
 female,face,face,Upper Face,Hyperpigmentation,hyperpigmentation
 female,face,face,Upper Face,Acne,acne
 female,face,face,Upper Face,Acne Scarring,acne-scarring
-female,face,face,Upper Face,Eye Bags,eye-bags
 female,face,face,Midface,Loss of Facial Volume,loss-of-facial-volume
 female,face,face,Midface,Nasolabial Folds,nasolabial-folds
 female,face,face,Midface,Acne,acne
 female,face,face,Midface,Acne Scarring,acne-scarring
-female,face,face,Midface,Melasma,melasma
-female,face,face,Midface,Rosacea,rosacea
+female,face,face,Midface,Skin Discoloration,skin-discoloration
 female,face,face,Midface,Broken Blood Vessels,broken-blood-vessels
-female,face,face,Midface,Freckles,freckles
-female,face,face,Midface,Port Wine Stains,port-wine-stains
 female,face,face,Midface,Uneven Skin Texture,uneven-skin-texture
 female,face,face,Midface,Facial Asymmetry,facial-asymmetry
+female,face,face,Midface,Hooded Eyelids,hooded-eyelids
+female,face,face,Midface,Puffy Eyes,puffy-eyes
+female,face,face,Midface,Eye Bags,eye-bags
+female,face,face,Midface,Wrinkles,wrinkles
+female,face,face,Midface,Rhinoplasty,rhinoplasty
+female,face,face,Midface,Septoplasty,septoplasty
 female,face,face,Lower Face,Jowls,jowls
 female,face,face,Lower Face,Double Chin,double-chin
 female,face,face,Lower Face,Loose Skin,loose-skin
@@ -77,6 +84,7 @@ female,face,face,Lower Face,Acne,acne
 female,face,face,Lower Face,Acne Scarring,acne-scarring
 female,face,face,Lower Face,Hyperpigmentation,hyperpigmentation
 female,face,face,Lower Face,Broken Blood Vessels,broken-blood-vessels
+female,face,face,Lower Face,Chin Implant,chin-implant
 female,face,face,Neck,Platysmal Bands,platysmal-bands
 female,face,face,Neck,Loose Skin,loose-skin
 female,face,face,Neck,Wrinkles,wrinkles
@@ -89,6 +97,8 @@ male,body,front,Abdomen,Excess Fat,excess-fat
 male,body,front,Abdomen,Loose Skin,loose-skin
 male,body,front,Abdomen,Muscle Tone,muscle-tone
 male,body,front,Abdomen,Stretch Marks,stretch-marks
+male,body,front,Abdomen,Tummy Tuck,tummy-tuck
+male,body,front,Abdomen,Liposuction,liposuction
 male,body,front,Arms,Excess Fat,excess-fat
 male,body,front,Arms,Loose Skin,loose-skin
 male,body,front,Arms,Hyperpigmentation,hyperpigmentation
@@ -97,15 +107,23 @@ male,body,front,Chest,Enlarged Areolas,enlarged-areolas
 male,body,front,Chest,Excess Fat,excess-fat
 male,body,front,Chest,Acne,acne
 male,body,front,Chest,Hyperpigmentation,hyperpigmentation
+male,body,front,Chest,Breast Enhancement,breast-enhancement
 male,body,front,Flanks,Excess Fat,excess-fat
+male,body,front,Flanks,Rib Contouring,rib-contouring
+male,body,front,Flanks,Waist Shaping,waist-shaping
+male,body,front,Flanks,Contouring,contouring
 male,body,front,Hands,Hyperpigmentation,hyperpigmentation
 male,body,front,Hands,Veins,veins
+male,body,front,Hands,Dry Skin,dry-skin
+male,body,front,Hands,Fine Lines,fine-lines
 male,body,front,Thighs,Excess Fat,excess-fat
 male,body,front,Thighs,Loose Skin,loose-skin
 male,body,front,Thighs,Muscle Sculpting,muscle-sculpting
 male,body,front,Lower Legs,Veins,veins
 male,body,front,Lower Legs,Broken Blood Vessels,broken-blood-vessels
 male,body,front,Lower Legs,Muscle Sculpting,muscle-sculpting
+male,body,front,Intimate,Intimate Enhancement,intimate-enhancement
+male,body,front,Intimate,Contouring,contouring
 male,body,back,Back,Excess Fat,excess-fat
 male,body,back,Back,Loose Skin,loose-skin
 male,body,back,Back,Keloid Scars,keloid-scars
@@ -118,21 +136,24 @@ male,body,back,Buttocks,Contouring,contouring
 male,face,face,Upper Face,Wrinkles,wrinkles
 male,face,face,Upper Face,Crow's Feet,crows-feet
 male,face,face,Upper Face,Frown Lines,frown-lines
-male,face,face,Upper Face,Hooded Eyelids,hooded-eyelids
-male,face,face,Upper Face,Puffy Eyes,puffy-eyes
 male,face,face,Upper Face,Fine Lines,fine-lines
 male,face,face,Upper Face,Acne,acne
 male,face,face,Upper Face,Acne Scarring,acne-scarring
 male,face,face,Upper Face,Hyperpigmentation,hyperpigmentation
-male,face,face,Upper Face,Eye Bags,eye-bags
 male,face,face,Midface,Loss of Facial Volume,loss-of-facial-volume
 male,face,face,Midface,Nasolabial Folds,nasolabial-folds
 male,face,face,Midface,Acne,acne
 male,face,face,Midface,Acne Scarring,acne-scarring
-male,face,face,Midface,Rosacea,rosacea
+male,face,face,Midface,Skin Discoloration,skin-discoloration
 male,face,face,Midface,Broken Blood Vessels,broken-blood-vessels
 male,face,face,Midface,Uneven Skin Texture,uneven-skin-texture
 male,face,face,Midface,Facial Asymmetry,facial-asymmetry
+male,face,face,Midface,Hooded Eyelids,hooded-eyelids
+male,face,face,Midface,Puffy Eyes,puffy-eyes
+male,face,face,Midface,Eye Bags,eye-bags
+male,face,face,Midface,Wrinkles,wrinkles
+male,face,face,Midface,Rhinoplasty,rhinoplasty
+male,face,face,Midface,Septoplasty,septoplasty
 male,face,face,Lower Face,Jowls,jowls
 male,face,face,Lower Face,Double Chin,double-chin
 male,face,face,Lower Face,Loose Skin,loose-skin
@@ -141,6 +162,7 @@ male,face,face,Lower Face,Acne,acne
 male,face,face,Lower Face,Acne Scarring,acne-scarring
 male,face,face,Lower Face,Hyperpigmentation,hyperpigmentation
 male,face,face,Lower Face,Broken Blood Vessels,broken-blood-vessels
+male,face,face,Lower Face,Chin Implant,chin-implant
 male,face,face,Neck,Platysmal Bands,platysmal-bands
 male,face,face,Neck,Loose Skin,loose-skin
 male,face,face,Neck,Double Chin,double-chin

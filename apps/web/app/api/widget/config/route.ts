@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { sanitizeCSS } from '@/lib/sanitize-css';
-import type { WidgetConfigResponse, WidgetRegion, WidgetConcern, WidgetMode } from '@treatment-builder/shared';
+import { getCorsOrigin, corsHeaders, handleCorsOptions } from '@/lib/cors';
+import type { WidgetConfigResponse, WidgetRegion, WidgetConcern, WidgetMode, SuccessFlowConfig } from '@treatment-builder/shared';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CACHE_ERROR = { 'Cache-Control': 'public, max-age=30' };
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
       .single(),
     supabase
       .from('widget_configs')
-      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, success_heading, success_action_url, success_action_type, success_action_label, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout')
+      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, success_heading, success_action_url, success_action_type, success_action_label, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout, success_flow_config, allowed_origins')
       .eq('tenant_id', tenantId)
       .single(),
   ]);
@@ -349,6 +350,30 @@ export async function GET(request: Request) {
     { id: 'default-email-opt-in', field_key: 'email_opt_in', field_type: 'checkbox', label: 'Email Opt-In', placeholder: 'I would like to receive email updates including exclusive promotions, new treatment announcements, and helpful skincare tips. Unsubscribe anytime.', options: null, is_required: false, display_order: 101 },
   ];
 
+  // ── Build success flow config (JSONB → old columns → defaults) ──
+  const flowCfg = config.success_flow_config as Partial<SuccessFlowConfig> | null;
+  const doctorName = flowCfg?.doctor_profile?.doctor_name || tenant.name;
+
+  const successFlow: SuccessFlowConfig = {
+    thank_you: {
+      enabled: flowCfg?.thank_you?.enabled !== false,
+      heading: flowCfg?.thank_you?.heading || config.success_heading || 'Thank You!',
+      body: flowCfg?.thank_you?.body || config.success_message || "Now is the best time to schedule a consultation. Based upon your concerns, this is the perfect time for us to help you get more freedom. You're gonna feel much better this season. With your new look and outlook on life, we are going to make sure your best view is showing.",
+    },
+    doctor_profile: {
+      enabled: flowCfg?.doctor_profile?.enabled !== false,
+      heading: flowCfg?.doctor_profile?.heading || `Meet ${doctorName}`,
+      body: flowCfg?.doctor_profile?.body || `${doctorName} is double board certified and a lineage of plastic surgeons who are well-renowned throughout the world. You're going to love the practice, the bedside manner, and the team members who are going to make sure that you are chaperoned through an ideal experience before your procedure, and you're going to become one of our family.`,
+      doctor_name: doctorName,
+    },
+    calendar: {
+      enabled: flowCfg?.calendar?.enabled !== false,
+      heading: flowCfg?.calendar?.heading || 'Schedule Your Consultation',
+      calendar_url: flowCfg?.calendar?.calendar_url || config.success_action_url || '',
+      calendar_embed_type: flowCfg?.calendar?.calendar_embed_type || (config.success_action_type as 'iframe' | 'button') || 'button',
+    },
+  };
+
   const response: WidgetConfigResponse = {
     tenant: {
       id: tenant.id,
@@ -369,6 +394,7 @@ export async function GET(request: Request) {
       success_action_label: config.success_action_label || 'Schedule Now',
       redirect_url: config.redirect_url,
       custom_css: config.custom_css ? sanitizeCSS(config.custom_css) : null,
+      success_flow: successFlow,
     },
     widget_mode: widgetMode,
     diagram_type: config.diagram_type || 'full_body',
@@ -380,20 +406,16 @@ export async function GET(request: Request) {
     locations: (tenantLocations || []).map(loc => ({ id: loc.id, name: loc.name, is_primary: loc.is_primary, city: loc.city, state: loc.state })),
   };
 
+  const origin = getCorsOrigin(request, config.allowed_origins as string[] | null);
+
   return NextResponse.json(response, {
     headers: {
       'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-      'Access-Control-Allow-Origin': '*',
+      ...corsHeaders(origin),
     },
   });
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+export async function OPTIONS(request: Request) {
+  return handleCorsOptions(request, 'GET, OPTIONS');
 }

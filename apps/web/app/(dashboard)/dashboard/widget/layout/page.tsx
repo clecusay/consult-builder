@@ -1,23 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
+import { updateWidgetConfig } from '@/lib/queries/widget-config';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Loader2,
-  Save,
-  Check,
-  Columns2,
-  ListOrdered,
-} from 'lucide-react';
+import { Columns2, ListOrdered } from 'lucide-react';
 import { logAuditClient } from '@/lib/audit/client';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type WidgetLayout = 'split' | 'guided';
 
@@ -46,58 +43,31 @@ const layoutOptions: LayoutOption[] = [
 ];
 
 export default function WidgetLayoutPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [selected, setSelected] = useState<WidgetLayout>('split');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const [configLoading, setConfigLoading] = useState(true);
 
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       const { data: config } = await supabase
         .from('widget_configs')
         .select('widget_layout')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .single();
 
       if (config?.widget_layout) {
         setSelected(config.widget_layout as WidgetLayout);
       }
-      setLoading(false);
+      setConfigLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
-
-    await supabase
-      .from('widget_configs')
-      .update({ widget_layout: selected })
-      .eq('tenant_id', tenantId);
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    await updateWidgetConfig(supabase, tenantId, { widget_layout: selected });
 
     logAuditClient({
       action: 'widget_config.layout_updated',
@@ -106,35 +76,15 @@ export default function WidgetLayoutPage() {
     });
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || configLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Widget Layout</h1>
-          <p className="text-muted-foreground">
-            Choose how the widget presents content to visitors
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Widget Layout" description="Choose how the widget presents content to visitors">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Layout selection cards */}
       <div className="grid gap-4 md:grid-cols-2">

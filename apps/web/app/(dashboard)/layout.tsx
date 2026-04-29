@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth/session';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/dashboard/app-sidebar';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
@@ -13,6 +14,12 @@ export default async function DashboardLayout({
   const session = await getSession();
 
   if (!session) {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Authenticated but no profile — needs setup
+      redirect('/setup');
+    }
     redirect('/login');
   }
 

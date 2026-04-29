@@ -4,6 +4,7 @@ import { deliverWebhook } from '@/lib/webhooks/deliver';
 import { type WebhookFormat } from '@/lib/webhooks/format';
 import { sendNotificationEmails } from '@/lib/email/send-notification';
 import { rateLimit } from '@/lib/rate-limit';
+import { getCorsOrigin, corsHeaders, handleCorsOptions } from '@/lib/cors';
 import { z } from 'zod';
 
 const submissionSchema = z.object({
@@ -37,7 +38,7 @@ const submissionSchema = z.object({
       category_name: z.string(),
     })
   ).default([]),
-  custom_fields: z.record(z.unknown()).default({}),
+  custom_fields: z.record(z.union([z.string().max(1000), z.number(), z.boolean(), z.null()])).refine(obj => Object.keys(obj).length <= 50, { message: 'Too many custom fields' }).default({}),
   sms_opt_in: z.boolean().optional(),
   email_opt_in: z.boolean().optional(),
   source_url: z.string().url().optional(),
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
       data.location_id
         ? supabase.from('tenant_locations').select('id, name, city, state').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
         : Promise.resolve({ data: null, error: null }),
-      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails').eq('tenant_id', tenant.id).single(),
+      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins').eq('tenant_id', tenant.id).single(),
     ]);
 
     if (data.location_id && (locationResult.error || !locationResult.data)) {
@@ -228,25 +229,20 @@ export async function POST(request: Request) {
       ).catch(err => console.error('Notification email error:', err));
     }
 
+    const origin = getCorsOrigin(request, config?.allowed_origins as string[] | null);
+
     return NextResponse.json(
       { success: true, id: submission.id },
       {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
+        headers: corsHeaders(origin),
       }
     );
-  } catch {
+  } catch (err) {
+    console.error('[widget/submit] Unhandled error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+export async function OPTIONS(request: Request) {
+  return handleCorsOptions(request, 'POST, OPTIONS');
 }

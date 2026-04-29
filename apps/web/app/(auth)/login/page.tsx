@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showResendConfirm, setShowResendConfirm] = useState(false);
+  const [resending, setResending] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -29,6 +31,9 @@ export default function LoginPage() {
     });
 
     if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        setShowResendConfirm(true);
+      }
       setError(error.message);
       setLoading(false);
       return;
@@ -36,6 +41,25 @@ export default function LoginPage() {
 
     router.push('/dashboard');
     router.refresh();
+  }
+
+  async function handleResendConfirmation() {
+    setResending(true);
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    setResending(false);
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setError('');
+      setShowResendConfirm(false);
+      setMagicLinkSent(true);
+    }
   }
 
   async function handleMagicLink() {
@@ -106,7 +130,17 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                {error}
+                <p>{error}</p>
+                {showResendConfirm && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={resending}
+                    className="mt-2 font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                  >
+                    {resending ? 'Sending...' : 'Resend confirmation email'}
+                  </button>
+                )}
               </div>
             )}
             <div className="space-y-2">

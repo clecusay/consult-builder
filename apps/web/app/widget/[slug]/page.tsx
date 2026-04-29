@@ -2,6 +2,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
 import type { Metadata } from 'next';
+import { buildWidgetAttrs } from '@/lib/widget/build-attrs';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -37,15 +38,13 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
 
   if (!tenant) notFound();
 
-  const attrs = [
-    `data-tenant-id="${tenant.id}"`,
-    'data-fullpage',
-    flow ? `data-flow="${flow}"` : '',
-    layout ? `data-layout="${layout}"` : '',
-    location ? `data-location="${location}"` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const attrs = buildWidgetAttrs({
+    tenantId: tenant.id,
+    fullpage: true,
+    flow,
+    layout,
+    location,
+  });
 
   return (
     <>
@@ -56,7 +55,7 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
           __html: `<treatment-builder ${attrs} style="flex:1;display:flex;flex-direction:column"></treatment-builder>`,
         }}
       />
-      <Script src={`/widget.js?v=${Date.now()}`} strategy="lazyOnload" />
+      <Script src={"/widget.js"} strategy="lazyOnload" />
     </>
   );
 }

@@ -44,6 +44,8 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const isSetupPage = request.nextUrl.pathname === '/setup';
+
   // Redirect unauthenticated users to login
   if (!user && (isDashboard || isAdmin)) {
     const url = request.nextUrl.clone();
@@ -52,11 +54,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+  if (user && (isDashboard || isAdmin || isAuthPage)) {
+    // Check if user has a profile (setup completed)
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    // No profile → send to setup (not dashboard)
+    if (!profile && !isSetupPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/setup';
+      return NextResponse.redirect(url);
+    }
+
+    // Has profile + on auth page → send to dashboard
+    if (profile && isAuthPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

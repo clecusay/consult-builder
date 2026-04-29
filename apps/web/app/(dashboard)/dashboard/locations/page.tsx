@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
@@ -17,8 +17,6 @@ import {
   MapPin,
   Plus,
   Trash2,
-  Loader2,
-  Save,
   Check,
   ChevronDown,
   ChevronUp,
@@ -26,6 +24,11 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { getActiveServices } from '@/lib/queries/services';
 
 interface Location {
   id: string;
@@ -46,40 +49,23 @@ interface ServiceOption {
 }
 
 export default function LocationsPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [locations, setLocations] = useState<Location[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
   // Tracks which services are DISABLED per location (opt-out model)
   const [disabledServices, setDisabledServices] = useState<Record<string, string[]>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [serviceSearch, setServiceSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
+    if (!tenantId) return;
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       // Load locations
       const { data: locs } = await supabase
         .from('tenant_locations')
         .select('id, name, address, city, state, zip, phone, is_primary')
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .order('is_primary', { ascending: false });
 
       const allLocs = (locs ?? []).map((l) => ({
@@ -95,18 +81,7 @@ export default function LocationsPage() {
       setLocations(allLocs);
 
       // Load active services with category names
-      const { data: svcData } = await supabase
-        .from('services')
-        .select('id, name, category_id, service_categories(name)')
-        .eq('tenant_id', profile.tenant_id)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      const svcs = (svcData ?? []).map((s) => ({
-        id: s.id,
-        name: s.name,
-        category_name: (s.service_categories as unknown as { name: string } | null)?.name ?? null,
-      }));
+      const svcs = await getActiveServices(supabase, tenantId!);
       setServices(svcs);
 
       // Load disabled services per location (opt-out model)
@@ -125,11 +100,11 @@ export default function LocationsPage() {
         setDisabledServices(map);
       }
 
-      setLoading(false);
+      setDataLoading(false);
     }
 
     load();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   // Group services by category for display
   const servicesByCategory = useMemo(() => {
@@ -191,8 +166,6 @@ export default function LocationsPage() {
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
 
     const validLocations = locations.filter((l) => l.name.trim());
 
@@ -212,12 +185,13 @@ export default function LocationsPage() {
       .filter((id) => !keepIds.has(id));
 
     if (toDeleteIds.length > 0) {
-      await supabase.from('tenant_locations').delete().in('id', toDeleteIds);
+      const { error: delError } = await supabase.from('tenant_locations').delete().in('id', toDeleteIds);
+      if (delError) throw new Error(delError.message);
     }
 
     // Update existing locations
     for (const loc of toUpdate) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('tenant_locations')
         .update({
           name: loc.name.trim(),
@@ -229,6 +203,7 @@ export default function LocationsPage() {
           is_primary: loc.is_primary,
         })
         .eq('id', loc.id);
+      if (updateError) throw new Error(updateError.message);
     }
 
     // Insert new locations
@@ -245,11 +220,12 @@ export default function LocationsPage() {
         is_primary: l.is_primary,
       }));
 
-      const { data } = await supabase
+      const { data, error: insertError } = await supabase
         .from('tenant_locations')
         .insert(insertRows)
         .select('id, name');
 
+      if (insertError) throw new Error(insertError.message);
       insertedLocs = data || [];
     }
 
@@ -260,7 +236,8 @@ export default function LocationsPage() {
       ...insertedLocs.map((l) => l.id),
     ];
     if (allLocationIds.length > 0) {
-      await supabase.from('location_disabled_services').delete().in('location_id', allLocationIds);
+      const { error: delLinksError } = await supabase.from('location_disabled_services').delete().in('location_id', allLocationIds);
+      if (delLinksError) throw new Error(delLinksError.message);
     }
 
     const allDisabledLinks: { location_id: string; service_id: string }[] = [];
@@ -286,12 +263,9 @@ export default function LocationsPage() {
 
     // Insert disabled service links
     if (allDisabledLinks.length > 0) {
-      await supabase.from('location_disabled_services').insert(allDisabledLinks);
+      const { error: linksError } = await supabase.from('location_disabled_services').insert(allDisabledLinks);
+      if (linksError) throw new Error(linksError.message);
     }
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
 
     // Refresh locations to get correct IDs for newly inserted ones
     const { data: refreshed } = await supabase
@@ -305,41 +279,21 @@ export default function LocationsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || dataLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
-          <p className="text-muted-foreground">
-            Manage your practice locations and assign services
-          </p>
-        </div>
+      <PageHeader title="Locations" description="Manage your practice locations and assign services">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={addLocation}>
             <Plus className="h-4 w-4" />
             Add Location
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : saved ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-          </Button>
+          <SaveButton onSave={handleSave} />
         </div>
-      </div>
+      </PageHeader>
 
       {/* Locations */}
       {locations.length > 0 ? (
@@ -627,16 +581,11 @@ export default function LocationsPage() {
       ) : (
         <Card>
           <CardContent className="py-16">
-            <div className="flex flex-col items-center justify-center text-center">
-              <MapPin className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="text-sm font-medium text-muted-foreground">
-                No locations added
-              </h3>
-              <p className="mt-1 max-w-sm text-xs text-muted-foreground/70">
-                Add your practice locations so visitors can find you. Click
-                &quot;Add Location&quot; to get started.
-              </p>
-            </div>
+            <EmptyState
+              icon={MapPin}
+              title="No locations added"
+              description='Add your practice locations so visitors can find you. Click "Add Location" to get started.'
+            />
           </CardContent>
         </Card>
       )}

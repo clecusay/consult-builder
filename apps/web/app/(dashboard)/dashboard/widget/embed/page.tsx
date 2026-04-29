@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
 import {
   Card,
   CardContent,
@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  Loader2,
   Copy,
   Check,
   Code2,
@@ -22,6 +21,8 @@ import {
   FileCode,
   MapPin,
 } from 'lucide-react';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import type { WidgetMode } from '@treatment-builder/shared';
 
 interface Location {
@@ -56,65 +57,51 @@ function FlowSelect({ value, onChange }: { value: WidgetMode; onChange: (v: Widg
 }
 
 export default function EmbedCodePage() {
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const { tenantId, supabase, loading } = useUserTenant();
   const [slug, setSlug] = useState<string | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [configLoading, setConfigLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [defaultMode, setDefaultMode] = useState<WidgetMode>('regions_concerns');
   const [universalFlow, setUniversalFlow] = useState<WidgetMode>('regions_concerns');
   const [locationFlows, setLocationFlows] = useState<Record<string, WidgetMode>>({});
 
-  const supabase = createClient();
-
   useEffect(() => {
+    if (!tenantId) return;
     async function loadData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id, tenants (id, slug)')
-        .eq('user_id', user.id)
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('slug')
+        .eq('id', tenantId)
         .single();
 
-      if (profile) {
-        const tenant = (profile as Record<string, unknown>).tenants as {
-          id: string;
-          slug: string;
-        };
-        setTenantId(tenant.id);
-        setSlug(tenant.slug);
+      if (tenant) setSlug(tenant.slug);
 
-        const tenantId = profile.tenant_id;
-        const { data: locs } = await supabase
-          .from('tenant_locations')
-          .select('id, name, address, city, state, is_primary')
-          .eq('tenant_id', tenantId)
-          .order('is_primary', { ascending: false })
-          .order('name');
+      const { data: locs } = await supabase
+        .from('tenant_locations')
+        .select('id, name, address, city, state, is_primary')
+        .eq('tenant_id', tenantId)
+        .order('is_primary', { ascending: false })
+        .order('name');
 
-        if (locs) setLocations(locs);
+      if (locs) setLocations(locs);
 
-        const { data: config } = await supabase
-          .from('widget_configs')
-          .select('widget_mode')
-          .eq('tenant_id', tenantId)
-          .single();
+      const { data: config } = await supabase
+        .from('widget_configs')
+        .select('widget_mode')
+        .eq('tenant_id', tenantId)
+        .single();
 
-        if (config?.widget_mode) {
-          const mode = config.widget_mode as WidgetMode;
-          setDefaultMode(mode);
-          setUniversalFlow(mode);
-        }
+      if (config?.widget_mode) {
+        const mode = config.widget_mode as WidgetMode;
+        setDefaultMode(mode);
+        setUniversalFlow(mode);
       }
-      setLoading(false);
+      setConfigLoading(false);
     }
 
     loadData();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   function getLocationFlow(locationId: string) {
     return locationFlows[locationId] ?? defaultMode;
@@ -140,23 +127,13 @@ export default function EmbedCodePage() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || configLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Embed Code</h1>
-        <p className="text-muted-foreground">
-          Add the treatment builder widget to your website
-        </p>
-      </div>
+      <PageHeader title="Embed Code" description="Add the treatment builder widget to your website" />
 
       {/* Universal Snippet */}
       <Card>

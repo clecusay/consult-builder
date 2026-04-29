@@ -10,7 +10,7 @@ export interface BodyAnchor {
 export const FEMALE_ANCHORS: BodyAnchor[] = [
   { id: 'face', label: 'Face', x: 454, y: 168, labelSide: 'right', regionSlugs: ['upper-face', 'midface', 'lips', 'lower-face'] },
   { id: 'neck', label: 'Neck', x: 454, y: 446, labelSide: 'left', regionSlugs: ['neck'] },
-  { id: 'chest', label: 'Chest', x: 613, y: 718, labelSide: 'right', regionSlugs: ['chest'] },
+  { id: 'chest', label: 'Breasts', x: 613, y: 718, labelSide: 'right', regionSlugs: ['chest'] },
   { id: 'arms', label: 'Arms', x: 152, y: 880, labelSide: 'right', regionSlugs: ['arms'] },
   { id: 'abdomen', label: 'Abdomen', x: 540, y: 1245, labelSide: 'right', regionSlugs: ['abdomen'] },
   { id: 'flanks', label: 'Flanks', x: 320, y: 1130, labelSide: 'left', regionSlugs: ['flanks'] },
@@ -28,6 +28,7 @@ export const MALE_ANCHORS: BodyAnchor[] = [
   { id: 'abdomen', label: 'Abdomen', x: 580, y: 1176, labelSide: 'right', regionSlugs: ['abdomen'] },
   { id: 'flanks', label: 'Flanks', x: 330, y: 1080, labelSide: 'left', regionSlugs: ['flanks'] },
   { id: 'hands', label: 'Hands', x: 880, y: 1600, labelSide: 'left', regionSlugs: ['hands'] },
+  { id: 'intimate', label: 'Intimate', x: 491, y: 1510, labelSide: 'right', regionSlugs: ['intimate'] },
   { id: 'thighs', label: 'Thighs', x: 590, y: 1850, labelSide: 'right', regionSlugs: ['thighs'] },
   { id: 'lower-legs', label: 'Lower Legs', x: 368, y: 2496, labelSide: 'left', regionSlugs: ['lower-legs'] },
 ];

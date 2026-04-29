@@ -62,7 +62,7 @@ export const concernSchema = z.object({
 
 export const formFieldSchema = z.object({
   field_key: z.string().max(50).nullable().optional(),
-  field_type: z.enum(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'radio']),
+  field_type: z.enum(['text', 'email', 'phone', 'date', 'textarea', 'select', 'checkbox', 'radio', 'location']),
   label: z.string().min(1).max(100),
   placeholder: z.string().max(200).nullable().optional(),
   options: z.array(z.string()).nullable().optional(),

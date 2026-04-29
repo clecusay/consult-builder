@@ -22,12 +22,13 @@ export default async function AuditLogPage() {
   await requireRole(['platform_admin']);
   const supabase = await createServerSupabaseClient();
 
-  const { data: logs } = await supabase
+  const { data: logs, error } = await supabase
     .from('audit_logs')
     .select('id, action, entity_type, entity_id, user_id, created_at')
     .order('created_at', { ascending: false })
     .limit(100);
 
+  if (error) console.error('[admin/audit-log] Query failed:', error);
   const allLogs = logs ?? [];
 
   return (

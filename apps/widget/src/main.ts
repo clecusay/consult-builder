@@ -16,22 +16,23 @@ import type {
   RegionStyle,
 } from '@treatment-builder/shared';
 import widgetStyles from './styles.css?inline';
-import { html, raw, SafeHTML } from './template';
+import { html, raw, sanitize, SafeHTML } from './template';
 import { ICONS } from './icons';
 import { renderBodySVG, renderFaceSVG } from './svg-renderer';
 import { getPainPoints, getOutcomes, BARRIERS, type TBOption } from './treatment-builder-data';
 
-type View = 'body' | 'guided-concerns' | 'form' | 'success'
+type View = 'body' | 'guided-concerns' | 'form'
+  | 'success-thankyou' | 'success-doctor' | 'success-calendar'
   | 'tb-pain-points' | 'tb-outcomes' | 'tb-barriers' | 'tb-bridge' | 'tb-lead-capture';
 
 const DEFAULT_CARD_DESCRIPTIONS: Record<string, string> = {
   'upper-face': 'Forehead, brow, temples',
-  'midface': 'Cheeks, under-eyes, nose',
+  'midface': 'Cheeks, eyes, nose',
   'lower-face': 'Jawline, chin, jowls',
   'lips': 'Volume, shape, lines',
   'neck': 'Bands, laxity, contour',
   'abdomen': 'Tuck, lipo, skin tightening',
-  'chest': 'Augmentation, lift, reduction',
+  'chest': 'Enhancement, lift, reduction',
   'flanks': 'Love handles, contouring',
   'arms': 'Lift, lipo, tightening',
   'hands': 'Volume, veins, skin quality',
@@ -58,6 +59,38 @@ const DISPLAY_GROUP_LABELS: Record<string, string> = {
 };
 
 const DISPLAY_GROUP_ORDER = ['face', 'upper_body', 'lower_body'];
+
+/** Search synonyms: maps common search terms to concern names they should match. */
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  'aging': ['wrinkles', 'fine lines', 'loose skin', 'crow\'s feet', 'frown lines', 'eye bags', 'hooded eyelids', 'sagging breasts', 'jowls'],
+  'old age': ['wrinkles', 'fine lines', 'loose skin', 'crow\'s feet', 'frown lines', 'eye bags', 'hooded eyelids'],
+  'sagging': ['loose skin', 'sagging breasts', 'jowls', 'hooded eyelids'],
+  'sag': ['loose skin', 'sagging breasts', 'jowls', 'hooded eyelids'],
+  'droopy': ['loose skin', 'jowls', 'hooded eyelids', 'sagging breasts'],
+  'lipo': ['liposuction', 'excess fat', 'contouring'],
+  'fat': ['excess fat', 'liposuction', 'contouring', 'double chin'],
+  'nose': ['rhinoplasty', 'septoplasty'],
+  'nose job': ['rhinoplasty'],
+  'chin': ['chin implant', 'double chin', 'jowls'],
+  'tummy': ['tummy tuck', 'abdomen', 'liposuction', 'c-section scar'],
+  'breast': ['breast enhancement', 'breast reduction', 'breast asymmetry', 'sagging breasts', 'implant exchange', 'breast removal / top surgery', 'enlarged areolas'],
+  'implant': ['implant exchange', 'breast enhancement', 'chin implant'],
+  'scar': ['acne scarring', 'c-section scar', 'keloid scars', 'stretch marks'],
+  'eyes': ['eye bags', 'puffy eyes', 'hooded eyelids', 'crow\'s feet'],
+  'eyelid': ['hooded eyelids'],
+  'botox': ['wrinkles', 'frown lines', 'crow\'s feet', 'fine lines'],
+  'filler': ['loss of facial volume', 'nasolabial folds', 'thin lips', 'lip enhancement'],
+  'lift': ['breast enhancement', 'tummy tuck', 'sagging breasts'],
+  'skin': ['loose skin', 'uneven skin texture', 'dry skin', 'skin discoloration'],
+  'discoloration': ['skin discoloration', 'hyperpigmentation'],
+  'redness': ['skin discoloration', 'broken blood vessels'],
+  'rosacea': ['skin discoloration'],
+  'melasma': ['skin discoloration'],
+  'waist': ['waist shaping', 'flanks', 'contouring'],
+  'rib': ['rib contouring'],
+  'vein': ['veins', 'broken blood vessels'],
+  'tattoo': ['hyperpigmentation'],
+};
 
 class TreatmentBuilderWidget extends HTMLElement {
   private shadow: ShadowRoot;
@@ -98,7 +131,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   constructor() {
     super();
-    this.shadow = this.attachShadow({ mode: 'open' });
+    this.shadow = this.attachShadow({ mode: 'closed' });
   }
 
   async connectedCallback() {
@@ -203,7 +236,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   private get selectedRegions(): WidgetRegion[] {
     return this.genderRegions
       .filter(r => this.selectedRegionSlugs.has(r.slug))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
   }
 
   private get concernsByRegion(): { regionName: string; regionSlug: string; concerns: (WidgetConcern & { regionSlug: string })[] }[] {
@@ -394,7 +427,9 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private reset() {
     this.view = 'body';
-    this.diagramView = 'body';
+    const allFace = this.config && this.config.regions.length > 0 &&
+      this.config.regions.every(r => r.body_area === 'face');
+    this.diagramView = allFace ? 'face' : 'body';
     this.bodySide = 'front';
     this.selectedGender = 'female';
     this.selectedRegionSlugs.clear();
@@ -431,7 +466,9 @@ class TreatmentBuilderWidget extends HTMLElement {
     const style = raw(`<style>${cssVars}${widgetStyles}${fullpageCss}</style>`);
 
     let content: SafeHTML;
-    if (this.view === 'success') content = this.renderSuccess();
+    if (this.view === 'success-thankyou') content = this.renderSuccessThankYou();
+    else if (this.view === 'success-doctor') content = this.renderSuccessDoctor();
+    else if (this.view === 'success-calendar') content = this.renderSuccessCalendar();
     else if (this.view === 'form') content = this.renderForm();
     else if (this.view === 'guided-concerns') content = this.renderGuidedConcerns();
     else if (this.view === 'tb-pain-points') content = this.renderTBPainPoints();
@@ -683,27 +720,27 @@ class TreatmentBuilderWidget extends HTMLElement {
       `;
     }
 
-    const query = this.concernSearchQuery.toLowerCase();
-
     return html`
       <div class="tb-panel-content">
-        ${this.showConcerns && this.selectedRegionSlugs.size > 0 ? html`
-          <div class="tb-search">
-            <span class="tb-search-icon">${raw(ICONS.search)}</span>
-            <input type="text" placeholder="Search concerns..." value="${this.concernSearchQuery}" data-action="search"/>
-            ${this.concernSearchQuery ? html`<button class="tb-search-clear" data-action="clear-search">${raw(ICONS.x)}</button>` : false}
-          </div>
-        ` : false}
-
         ${this.showConcerns ? (() => {
-          const hasQuery = !!query;
+          const query = this.concernSearchQuery.trim().toLowerCase();
+          const hasQuery = query.length > 0;
+          const synonymMatches = hasQuery
+            ? new Set(Object.entries(SEARCH_SYNONYMS)
+                .filter(([key]) => key.includes(query) || query.includes(key))
+                .flatMap(([, names]) => names.map(n => n.toLowerCase())))
+            : new Set<string>();
+          const matchesConcern = (name: string) => {
+            const lower = name.toLowerCase();
+            return lower.includes(query) || synonymMatches.has(lower);
+          };
           let anyVisible = false;
           const groups = this.concernsByRegion.map(group => {
             const isExpanded = this.expandedRegions.has(group.regionSlug);
             const count = this.getRegionConcernCount(group.regionSlug);
             const popularIds = this.getPopularIds(group.concerns);
             const filtered = hasQuery
-              ? group.concerns.filter(c => c.name.toLowerCase().includes(query))
+              ? group.concerns.filter(c => matchesConcern(c.name))
               : group.concerns;
             if (hasQuery && filtered.length === 0) return false;
             anyVisible = true;
@@ -782,7 +819,6 @@ class TreatmentBuilderWidget extends HTMLElement {
 
   private renderGuidedConcerns(): SafeHTML {
     const cfg = this.config!;
-    const query = this.concernSearchQuery.toLowerCase();
 
     return html`
       <div class="tb-root">
@@ -795,24 +831,26 @@ class TreatmentBuilderWidget extends HTMLElement {
         ${this.renderStepIndicator()}
 
         <div class="tb-guided-concerns">
-          ${this.showConcerns ? html`
-            <div class="tb-search">
-              <span class="tb-search-icon">${raw(ICONS.search)}</span>
-              <input type="text" placeholder="Search concerns..." value="${this.concernSearchQuery}" data-action="search"/>
-              ${this.concernSearchQuery ? html`<button class="tb-search-clear" data-action="clear-search">${raw(ICONS.x)}</button>` : false}
-            </div>
-          ` : false}
-
           <div class="tb-guided-list">
             ${this.showConcerns ? (() => {
-              const hasQuery = !!query;
+              const query = this.concernSearchQuery.trim().toLowerCase();
+              const hasQuery = query.length > 0;
+              const synonymMatches = hasQuery
+                ? new Set(Object.entries(SEARCH_SYNONYMS)
+                    .filter(([key]) => key.includes(query) || query.includes(key))
+                    .flatMap(([, names]) => names.map(n => n.toLowerCase())))
+                : new Set<string>();
+              const matchesConcern = (name: string) => {
+                const lower = name.toLowerCase();
+                return lower.includes(query) || synonymMatches.has(lower);
+              };
               let anyVisible = false;
               const groups = this.concernsByRegion.map(group => {
                 const isExpanded = this.expandedRegions.has(group.regionSlug);
                 const count = this.getRegionConcernCount(group.regionSlug);
                 const popularIds = this.getPopularIds(group.concerns);
                 const filtered = hasQuery
-                  ? group.concerns.filter(c => c.name.toLowerCase().includes(query))
+                  ? group.concerns.filter(c => matchesConcern(c.name))
                   : group.concerns;
                 if (hasQuery && filtered.length === 0) return false;
                 anyVisible = true;
@@ -1157,7 +1195,7 @@ class TreatmentBuilderWidget extends HTMLElement {
       <div class="tb-root">
         <div class="tb-header">
           <h2>Complete Your Consultation Request</h2>
-          <p>Fill in your details and we'll reach out with personalized recommendations</p>
+          <p>Fill in your details below. We'll reach out to book your consultation and provide personalized results based on your concerns.</p>
         </div>
 
         ${this.renderStepIndicator()}
@@ -1242,36 +1280,133 @@ class TreatmentBuilderWidget extends HTMLElement {
     `;
   }
 
-  // ── Success View ──
+  // ── Success Flow Views (3-page post-submission) ──
 
-  private renderSuccess(): SafeHTML {
-    const cfg = this.config!;
-    const b = cfg.branding;
-    const actionUrl = b.success_action_url;
-    const actionType = b.success_action_type;
-    const actionLabel = b.success_action_label || 'Schedule Now';
+  /** Split text on double-newlines into separate <p> tags. */
+  private renderParagraphs(text: string): SafeHTML[] {
+    return text.split(/\n\s*\n/).filter(Boolean).map(p => html`<p>${p.trim()}</p>`);
+  }
+
+  /** Get the ordered list of enabled success flow views. */
+  private get enabledSuccessViews(): View[] {
+    const flow = this.config?.branding.success_flow;
+    if (!flow) return ['success-thankyou', 'success-doctor', 'success-calendar'];
+    const views: View[] = [];
+    if (flow.thank_you.enabled) views.push('success-thankyou');
+    if (flow.doctor_profile.enabled) views.push('success-doctor');
+    if (flow.calendar.enabled) views.push('success-calendar');
+    // If everything is disabled, show at least the thank you page
+    if (views.length === 0) views.push('success-thankyou');
+    return views;
+  }
+
+  /** Get the first enabled success view (for after form submit). */
+  private get firstSuccessView(): View {
+    return this.enabledSuccessViews[0];
+  }
+
+  /** Get the next enabled success view, or null if this is the last. */
+  private nextSuccessView(current: View): View | null {
+    const views = this.enabledSuccessViews;
+    const idx = views.indexOf(current);
+    return idx >= 0 && idx < views.length - 1 ? views[idx + 1] : null;
+  }
+
+  private renderSuccessStepDots(activeStep: View): SafeHTML {
     const pc = this.primaryColor;
+    const views = this.enabledSuccessViews;
+    const activeIdx = views.indexOf(activeStep);
+    return html`
+      <div class="tb-success-dots">
+        ${views.map((_, i) => html`
+          <div class="tb-success-dot ${i === activeIdx ? 'active' : ''}"
+               style="background:${i === activeIdx ? pc : '#cbd5e1'}"></div>
+        `)}
+      </div>
+    `;
+  }
+
+  /** Render the continue/reset button for a success flow page. */
+  private renderSuccessNav(currentView: View): SafeHTML {
+    const pc = this.primaryColor;
+    const next = this.nextSuccessView(currentView);
+    return html`
+      <div class="tb-success-flow-footer">
+        ${this.renderSuccessStepDots(currentView)}
+        ${next ? html`
+          <button class="tb-success-flow-continue" style="background:${pc}" data-action="success-next">
+            Continue ${raw(ICONS.chevronRight)}
+          </button>
+        ` : html`
+          <button class="tb-reset-btn" data-action="reset">Start Over</button>
+        `}
+      </div>
+    `;
+  }
+
+  private renderSuccessThankYou(): SafeHTML {
+    const cfg = this.config!;
+    const flow = cfg.branding.success_flow;
+    const logoUrl = cfg.tenant.logo_url;
 
     return html`
       <div class="tb-root">
-        <div class="tb-success">
-          <div class="tb-success-icon">${raw(ICONS.check)}</div>
-          <h2>${b.success_heading || 'Thank You!'}</h2>
-          <p>${b.success_message || "Thank you for your interest! We'll be in touch shortly with personalized recommendations."}</p>
+        <div class="tb-success-flow">
+          ${logoUrl ? html`<img class="tb-success-flow-logo" src="${logoUrl}" alt="${cfg.tenant.name}">` : false}
+          <div class="tb-success-flow-icon">${raw(ICONS.check)}</div>
+          <h2>${flow.thank_you.heading}</h2>
+          <div class="tb-success-flow-body">${sanitize(flow.thank_you.body)}</div>
+          ${this.renderSuccessNav('success-thankyou')}
+        </div>
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
 
-          ${actionUrl && actionType === 'button' ? html`
-            <a class="tb-success-cta" href="${actionUrl}" target="_blank" rel="noopener noreferrer" style="background:${pc}">
-              ${actionLabel}
-            </a>
-          ` : false}
+  private renderSuccessDoctor(): SafeHTML {
+    const cfg = this.config!;
+    const flow = cfg.branding.success_flow;
+    const logoUrl = cfg.tenant.logo_url;
 
-          ${actionUrl && actionType === 'embed' ? html`
+    return html`
+      <div class="tb-root">
+        <div class="tb-success-flow">
+          ${logoUrl ? html`<img class="tb-success-flow-logo" src="${logoUrl}" alt="${cfg.tenant.name}">` : false}
+          <h2>${flow.doctor_profile.heading}</h2>
+          <div class="tb-success-flow-body">${sanitize(flow.doctor_profile.body)}</div>
+          ${this.renderSuccessNav('success-doctor')}
+        </div>
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  private renderSuccessCalendar(): SafeHTML {
+    const cfg = this.config!;
+    const flow = cfg.branding.success_flow;
+    const pc = this.primaryColor;
+    const calUrl = flow.calendar.calendar_url;
+    const embedType = flow.calendar.calendar_embed_type;
+    const safeCalUrl = calUrl && /^https:\/\//i.test(calUrl) ? calUrl : '';
+
+    return html`
+      <div class="tb-root">
+        <div class="tb-success-flow">
+          <h2>${flow.calendar.heading}</h2>
+
+          ${safeCalUrl && embedType === 'iframe' ? html`
             <div class="tb-success-embed">
-              <iframe src="${actionUrl}" frameborder="0" style="width:100%;min-height:400px;border:none;border-radius:8px"></iframe>
+              <iframe src="${safeCalUrl}" frameborder="0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="width:100%;min-height:400px;border:none;border-radius:8px"></iframe>
             </div>
           ` : false}
 
-          <button class="tb-reset-btn" data-action="reset">Start Over</button>
+          ${safeCalUrl && embedType === 'button' ? html`
+            <a class="tb-success-flow-continue" href="${safeCalUrl}" target="_blank" rel="noopener noreferrer" style="background:${pc};text-decoration:none;display:inline-flex">
+              Schedule Now ${raw(ICONS.chevronRight)}
+            </a>
+          ` : false}
+
+          ${this.renderSuccessNav('success-calendar')}
         </div>
         ${this.renderFooter()}
       </div>
@@ -1336,6 +1471,11 @@ class TreatmentBuilderWidget extends HTMLElement {
           return;
         }
         if (action === 'back-to-body-diagram') { this.diagramView = 'body'; this.render(); return; }
+        if (action === 'success-next') {
+          const next = this.nextSuccessView(this.view);
+          if (next) { this.view = next; this.render(); }
+          return;
+        }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }
 
@@ -1538,7 +1678,7 @@ class TreatmentBuilderWidget extends HTMLElement {
       selected_concerns: selectedConcerns,
       selected_services: selectedServices,
       custom_fields: customFields,
-      source_url: window.location.href,
+      source_url: window.location.origin + window.location.pathname,
       utm_source: utmSource,
       utm_medium: utmMedium,
       utm_campaign: utmCampaign,
@@ -1588,7 +1728,7 @@ class TreatmentBuilderWidget extends HTMLElement {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Submission failed (${res.status})`);
       }
-      this.view = 'success';
+      this.view = this.firstSuccessView;
     } catch (err) {
       this.formError = err instanceof Error ? err.message : 'Submission failed. Please try again.';
     } finally {

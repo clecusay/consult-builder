@@ -6,6 +6,8 @@
  * - `null`, `undefined`, and `false` produce no output (for conditionals).
  */
 
+import DOMPurify from 'dompurify';
+
 /** Marks a string as pre-escaped / trusted HTML. */
 export class SafeHTML {
   constructor(readonly value: string) {}
@@ -43,4 +45,9 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): SafeH
 /** Wrap a trusted string to bypass auto-escaping. */
 export function raw(s: string): SafeHTML {
   return new SafeHTML(s);
+}
+
+/** Sanitize untrusted HTML (from API/DB) to prevent XSS, then wrap as SafeHTML. */
+export function sanitize(s: string): SafeHTML {
+  return new SafeHTML(DOMPurify.sanitize(s));
 }

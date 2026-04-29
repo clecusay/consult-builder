@@ -17,29 +17,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Shield, Building2 } from 'lucide-react';
-
-const statusStyles: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  inactive: 'bg-gray-100 text-gray-500',
-  suspended: 'bg-red-100 text-red-700',
-};
-
-const planStyles: Record<string, string> = {
-  free: 'bg-gray-100 text-gray-700',
-  starter: 'bg-blue-100 text-blue-700',
-  professional: 'bg-purple-100 text-purple-700',
-  enterprise: 'bg-amber-100 text-amber-700',
-};
+import { EmptyState } from '@/components/ui/empty-state';
+import { TENANT_STATUS_STYLES, PLAN_STYLES } from '@/lib/constants/badge-styles';
 
 export default async function ManageTenantsPage() {
   await requireRole(['platform_admin']);
   const supabase = await createServerSupabaseClient();
 
-  const { data: tenants } = await supabase
+  const { data: tenants, error } = await supabase
     .from('tenants')
     .select('id, name, slug, status, billing_plan, created_at')
     .order('created_at', { ascending: false });
 
+  if (error) console.error('[admin/tenants] Query failed:', error);
   const allTenants = tenants ?? [];
 
   return (
@@ -92,7 +82,7 @@ export default async function ManageTenantsPage() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={statusStyles[tenant.status] ?? ''}
+                        className={TENANT_STATUS_STYLES[tenant.status] ?? ''}
                       >
                         {tenant.status}
                       </Badge>
@@ -100,7 +90,7 @@ export default async function ManageTenantsPage() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={planStyles[tenant.billing_plan] ?? ''}
+                        className={PLAN_STYLES[tenant.billing_plan] ?? ''}
                       >
                         {tenant.billing_plan}
                       </Badge>
@@ -113,12 +103,10 @@ export default async function ManageTenantsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-              <Building2 className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="text-sm font-medium text-muted-foreground">
-                No tenants registered
-              </h3>
-            </div>
+            <EmptyState
+              icon={Building2}
+              title="No tenants registered"
+            />
           )}
         </CardContent>
       </Card>

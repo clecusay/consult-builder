@@ -27,14 +27,8 @@ import {
   Code2,
 } from 'lucide-react';
 import Link from 'next/link';
-
-const statusStyles: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  contacted: 'bg-yellow-100 text-yellow-700',
-  scheduled: 'bg-purple-100 text-purple-700',
-  converted: 'bg-green-100 text-green-700',
-  lost: 'bg-gray-100 text-gray-500',
-};
+import { EmptyState } from '@/components/ui/empty-state';
+import { LEAD_STATUS_STYLES } from '@/lib/constants/badge-styles';
 
 export default async function DashboardPage() {
   const session = await requireSession();
@@ -206,7 +200,7 @@ export default async function DashboardPage() {
                       <Badge
                         variant="secondary"
                         className={
-                          statusStyles[sub.lead_status] ?? ''
+                          LEAD_STATUS_STYLES[sub.lead_status] ?? ''
                         }
                       >
                         {sub.lead_status}
@@ -217,15 +211,11 @@ export default async function DashboardPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-              <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
-              <p className="text-sm font-medium text-muted-foreground">
-                No submissions yet
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                Submissions will appear here once your widget is live.
-              </p>
-            </div>
+            <EmptyState
+              icon={Inbox}
+              title="No submissions yet"
+              description="Submissions will appear here once your widget is live."
+            />
           )}
         </CardContent>
       </Card>

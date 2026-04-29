@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
+import { updateWidgetConfig } from '@/lib/queries/widget-config';
 import {
   Card,
   CardContent,
@@ -9,11 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Save, Check } from 'lucide-react';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface BrandingConfig {
   primary_color: string;
@@ -163,6 +165,7 @@ function WidgetPreview({ config }: { config: BrandingConfig }) {
 }
 
 export default function WidgetBrandingPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [config, setConfig] = useState<BrandingConfig>({
     primary_color: '#1a1a2e',
     secondary_color: '#16213e',
@@ -171,35 +174,17 @@ export default function WidgetBrandingPage() {
     cta_text: 'Book Your Consultation',
     success_message: 'Thank you! We will be in touch shortly.',
   });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const [configLoading, setConfigLoading] = useState(true);
 
   useEffect(() => {
+    if (!tenantId) return;
     async function loadConfig() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       const { data: widgetConfig } = await supabase
         .from('widget_configs')
         .select(
           'primary_color, secondary_color, accent_color, font_family, cta_text, success_message'
         )
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .single();
 
       if (widgetConfig) {
@@ -212,65 +197,33 @@ export default function WidgetBrandingPage() {
           success_message: widgetConfig.success_message,
         });
       }
-      setLoading(false);
+      setConfigLoading(false);
     }
 
     loadConfig();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
-
-    await supabase
-      .from('widget_configs')
-      .update({
-        primary_color: config.primary_color,
-        secondary_color: config.secondary_color,
-        accent_color: config.accent_color,
-        font_family: config.font_family,
-        cta_text: config.cta_text,
-        success_message: config.success_message,
-      })
-      .eq('tenant_id', tenantId);
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    await updateWidgetConfig(supabase, tenantId, {
+      primary_color: config.primary_color,
+      secondary_color: config.secondary_color,
+      accent_color: config.accent_color,
+      font_family: config.font_family,
+      cta_text: config.cta_text,
+      success_message: config.success_message,
+    });
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || configLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Widget Branding
-          </h1>
-          <p className="text-muted-foreground">
-            Customize your widget&apos;s appearance
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Widget Branding" description="Customize your widget's appearance">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Two-column: Config left, Preview right */}
       <div className="grid gap-6 lg:grid-cols-5">

@@ -40,13 +40,7 @@ type Submission = {
   created_at: string;
 };
 
-const statusStyles: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  contacted: 'bg-yellow-100 text-yellow-700',
-  scheduled: 'bg-purple-100 text-purple-700',
-  converted: 'bg-green-100 text-green-700',
-  lost: 'bg-gray-100 text-gray-500',
-};
+import { LEAD_STATUS_STYLES } from '@/lib/constants/badge-styles';
 
 function DetailLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -330,7 +324,7 @@ export function SubmissionsTable({ submissions }: { submissions: Submission[] })
                 <TableCell>
                   <Badge
                     variant="secondary"
-                    className={statusStyles[sub.lead_status] ?? ''}
+                    className={LEAD_STATUS_STYLES[sub.lead_status] ?? ''}
                   >
                     {sub.lead_status}
                   </Badge>

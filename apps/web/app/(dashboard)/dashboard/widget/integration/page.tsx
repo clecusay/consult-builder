@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useUserTenant } from '@/hooks/use-user-tenant';
+import { updateWidgetConfig } from '@/lib/queries/widget-config';
 import {
   Card,
   CardContent,
@@ -12,12 +13,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
   Loader2,
-  Save,
-  Check,
   Webhook,
   Mail,
   Globe,
@@ -25,6 +23,9 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { SaveButton } from '@/components/ui/save-button';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 import { formatWebhookPayload, shouldSkipSigning, type WebhookFormat } from '@/lib/webhooks/format';
 
@@ -37,6 +38,7 @@ interface IntegrationConfig {
 }
 
 export default function IntegrationSettingsPage() {
+  const { tenantId, supabase, loading } = useUserTenant();
   const [config, setConfig] = useState<IntegrationConfig>({
     webhook_url: '',
     webhook_secret: '',
@@ -44,39 +46,21 @@ export default function IntegrationSettingsPage() {
     notification_emails: [],
     allowed_origins: [],
   });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [tenantId, setTenantId] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState('');
   const [newOrigin, setNewOrigin] = useState('');
 
-  const supabase = createClient();
-
   useEffect(() => {
+    if (!tenantId) return;
     async function loadConfig() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) return;
-      setTenantId(profile.tenant_id);
-
       const { data: widgetConfig } = await supabase
         .from('widget_configs')
         .select(
           'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins'
         )
-        .eq('tenant_id', profile.tenant_id)
+        .eq('tenant_id', tenantId)
         .single();
 
       if (widgetConfig) {
@@ -88,31 +72,21 @@ export default function IntegrationSettingsPage() {
           allowed_origins: widgetConfig.allowed_origins ?? [],
         });
       }
-      setLoading(false);
+      setConfigLoading(false);
     }
 
     loadConfig();
-  }, [supabase]);
+  }, [tenantId, supabase]);
 
   async function handleSave() {
     if (!tenantId) return;
-    setSaving(true);
-    setSaved(false);
-
-    await supabase
-      .from('widget_configs')
-      .update({
-        webhook_url: config.webhook_url || null,
-        webhook_secret: config.webhook_secret || null,
-        webhook_format: config.webhook_format,
-        notification_emails: config.notification_emails,
-        allowed_origins: config.allowed_origins,
-      })
-      .eq('tenant_id', tenantId);
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    await updateWidgetConfig(supabase, tenantId, {
+      webhook_url: config.webhook_url || null,
+      webhook_secret: config.webhook_secret || null,
+      webhook_format: config.webhook_format,
+      notification_emails: config.notification_emails,
+      allowed_origins: config.allowed_origins,
+    });
   }
 
   async function handleTestWebhook() {
@@ -212,35 +186,15 @@ export default function IntegrationSettingsPage() {
     });
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (loading || configLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Integration</h1>
-          <p className="text-muted-foreground">
-            Configure webhooks and notifications
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader title="Integration" description="Configure webhooks and notifications">
+        <SaveButton onSave={handleSave} />
+      </PageHeader>
 
       {/* Webhook Section */}
       <Card>

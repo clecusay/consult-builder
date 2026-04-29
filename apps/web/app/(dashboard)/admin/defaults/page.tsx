@@ -17,17 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Shield, MapPin, Sparkles } from 'lucide-react';
-
-const genderStyles: Record<string, string> = {
-  female: 'bg-pink-100 text-pink-700',
-  male: 'bg-blue-100 text-blue-700',
-  all: 'bg-gray-100 text-gray-700',
-};
-
-const bodyAreaStyles: Record<string, string> = {
-  face: 'bg-amber-100 text-amber-700',
-  body: 'bg-teal-100 text-teal-700',
-};
+import { EmptyState } from '@/components/ui/empty-state';
+import { GENDER_STYLES, BODY_AREA_STYLES } from '@/lib/constants/badge-styles';
 
 export default async function PlatformDefaultsPage() {
   await requireRole(['platform_admin']);
@@ -137,7 +128,7 @@ export default async function PlatformDefaultsPage() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={genderStyles[region.gender] ?? ''}
+                        className={GENDER_STYLES[region.gender] ?? ''}
                       >
                         {region.gender}
                       </Badge>
@@ -145,7 +136,7 @@ export default async function PlatformDefaultsPage() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={bodyAreaStyles[region.body_area] ?? ''}
+                        className={BODY_AREA_STYLES[region.body_area] ?? ''}
                       >
                         {region.body_area}
                       </Badge>
@@ -175,16 +166,11 @@ export default async function PlatformDefaultsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-              <MapPin className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="text-sm font-medium text-muted-foreground">
-                No default regions configured
-              </h3>
-              <p className="mt-1 max-w-sm text-xs text-muted-foreground/70">
-                Add default body regions that will be available to all tenants
-                on the platform.
-              </p>
-            </div>
+            <EmptyState
+              icon={MapPin}
+              title="No default regions configured"
+              description="Add default body regions that will be available to all tenants on the platform."
+            />
           )}
         </CardContent>
       </Card>

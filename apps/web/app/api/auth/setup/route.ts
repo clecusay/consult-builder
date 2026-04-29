@@ -24,6 +24,24 @@ export async function POST(request: Request) {
     const { user_id, center_name, slug, full_name } = parsed.data;
     const supabase = await createServiceRoleClient();
 
+    // Security: verify the user_id exists in auth and has no profile yet.
+    // This prevents hijacking — existing users already have profiles, so
+    // setup can only run for genuinely new users.
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(user_id);
+    if (authError || !authUser.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('user_id', user_id)
+      .single();
+
+    if (existingProfile) {
+      return NextResponse.json({ error: 'Account already set up' }, { status: 409 });
+    }
+
     // Check if slug is taken
     const { data: existingTenant } = await supabase
       .from('tenants')
