@@ -11,6 +11,7 @@ export interface Tenant {
   name: string;
   slug: string;
   logo_url: string | null;
+  website_url: string | null;
   status: 'active' | 'inactive' | 'suspended';
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -294,6 +295,7 @@ export interface WidgetConfigResponse {
     name: string;
     slug: string;
     logo_url: string | null;
+    website_url: string | null;
   };
   branding: {
     primary_color: string;

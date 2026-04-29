@@ -1414,9 +1414,10 @@ class TreatmentBuilderWidget extends HTMLElement {
   // ── Footer ──
 
   private renderFooter(): SafeHTML {
+    const websiteUrl = this.config?.tenant.website_url;
     return html`
       <div class="tb-footer">
-        <button class="tb-exit-btn" data-action="exit-widget">Return to website</button>
+        ${websiteUrl ? html`<a class="tb-exit-btn" href="${websiteUrl}" rel="noopener noreferrer">Return to website</a>` : html`<span></span>`}
         ${this.fullpage ? html`<span class="tb-footer-powered">Powered by Consult Intake</span>` : false}
       </div>
     `;
@@ -1475,14 +1476,6 @@ class TreatmentBuilderWidget extends HTMLElement {
           return;
         }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
-        if (action === 'exit-widget') {
-          if (this.fullpage) {
-            window.history.back();
-          } else {
-            this.dispatchEvent(new CustomEvent('tb-exit', { bubbles: true, composed: true }));
-          }
-          return;
-        }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }
 
         // Treatment Builder navigation

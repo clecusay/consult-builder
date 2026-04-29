@@ -11,10 +11,14 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Copy, Check, Building2, CreditCard } from 'lucide-react';
+import { Copy, Check, Building2, CreditCard, Globe } from 'lucide-react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { SaveButton } from '@/components/ui/save-button';
+import { toast } from 'sonner';
 import { TENANT_STATUS_STYLES, PLAN_STYLES } from '@/lib/constants/badge-styles';
 
 interface TenantInfo {
@@ -23,6 +27,7 @@ interface TenantInfo {
   slug: string;
   status: string;
   billing_plan: string;
+  website_url: string | null;
 }
 
 export default function SettingsPage() {
@@ -31,18 +36,20 @@ export default function SettingsPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [copiedSlug, setCopiedSlug] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState('');
 
   useEffect(() => {
     if (!tenantId) return;
     async function loadTenant() {
       const { data: tenantData } = await supabase
         .from('tenants')
-        .select('id, name, slug, status, billing_plan')
+        .select('id, name, slug, status, billing_plan, website_url')
         .eq('id', tenantId)
         .single();
 
       if (tenantData) {
         setTenant(tenantData);
+        setWebsiteUrl(tenantData.website_url || '');
       }
       setDataLoading(false);
     }
@@ -54,6 +61,15 @@ export default function SettingsPage() {
     await navigator.clipboard.writeText(text);
     setter(true);
     setTimeout(() => setter(false), 2000);
+  }
+
+  async function handleSaveWebsite() {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('tenants')
+      .update({ website_url: websiteUrl.trim() || null })
+      .eq('id', tenantId);
+    if (error) throw new Error(error.message);
   }
 
   if (loading || dataLoading) {
@@ -148,6 +164,30 @@ export default function SettingsPage() {
                   tenant.billing_plan.slice(1)}
               </Badge>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Website URL */}
+          <div className="space-y-2">
+            <Label htmlFor="website-url" className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5" />
+              Website URL
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="website-url"
+                type="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://www.yourpractice.com"
+                className="max-w-sm"
+              />
+              <SaveButton onSave={handleSaveWebsite} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Shown as a &quot;Return to website&quot; link in your widget
+            </p>
           </div>
 
           <Separator />

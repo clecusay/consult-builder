@@ -67,7 +67,7 @@ export async function GET(request: Request) {
   const [tenantResult, configResult] = await Promise.all([
     supabase
       .from('tenants')
-      .select('id, name, slug, logo_url, status')
+      .select('id, name, slug, logo_url, status, website_url')
       .eq('id', tenantId)
       .eq('status', 'active')
       .single(),
@@ -380,6 +380,7 @@ export async function GET(request: Request) {
       name: tenant.name,
       slug: tenant.slug,
       logo_url: tenant.logo_url,
+      website_url: tenant.website_url || null,
     },
     branding: {
       primary_color: config.primary_color,
