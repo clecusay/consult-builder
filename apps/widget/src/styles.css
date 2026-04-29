@@ -967,20 +967,20 @@
   font-weight: 700;
   margin: 0 0 16px;
   color: #1e293b;
-  max-width: 440px;
+  max-width: 580px;
   line-height: 1.4;
 }
 
 .tb-success-flow p {
   font-size: 14px;
   color: #475569;
-  max-width: 440px;
+  max-width: 580px;
   margin: 0 0 12px;
   line-height: 1.7;
 }
 
 .tb-success-flow-body {
-  max-width: 440px;
+  max-width: 580px;
   margin: 0 0 24px;
   width: 100%;
   overflow-y: auto;
