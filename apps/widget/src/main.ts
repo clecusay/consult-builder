@@ -486,7 +486,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.wireEvents();
 
     // Lock height after first render to prevent layout shifts
-    if (!this.fullpage && this.lockedHeight === null) {
+    if (this.lockedHeight === null) {
       requestAnimationFrame(() => {
         const root = this.shadow.querySelector('.tb-root') as HTMLElement;
         if (root) {
@@ -494,7 +494,7 @@ class TreatmentBuilderWidget extends HTMLElement {
           root.style.minHeight = `${this.lockedHeight}px`;
         }
       });
-    } else if (!this.fullpage && this.lockedHeight !== null) {
+    } else {
       const root = this.shadow.querySelector('.tb-root') as HTMLElement;
       if (root) root.style.minHeight = `${this.lockedHeight}px`;
     }
@@ -1726,6 +1726,11 @@ class TreatmentBuilderWidget extends HTMLElement {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Submission failed (${res.status})`);
+      }
+      // Lock the height so the success flow doesn't collapse
+      const root = this.shadow.querySelector('.tb-root') as HTMLElement | null;
+      if (root) {
+        this.lockedHeight = root.offsetHeight;
       }
       this.view = this.firstSuccessView;
     } catch (err) {
