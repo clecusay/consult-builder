@@ -49,6 +49,7 @@ function renderAnchor(
         fill="${isSelected ? primaryColor : '#fff'}"
         stroke="${primaryColor}"
         stroke-width="${isSelected ? 0 : strokeW}"
+        stroke-opacity="${isSelected ? 1 : 0.5}"
         filter="url(#tb-shadow)"/>
       ${isSelected
         ? raw(`<svg x="${anchor.x - s / 2}" y="${anchor.y - s / 2}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`)
