@@ -936,6 +936,7 @@
   padding: 40px 24px 28px;
   text-align: left;
   flex: 1;
+  overflow-y: auto;
 }
 
 .tb-success-flow-logo {
