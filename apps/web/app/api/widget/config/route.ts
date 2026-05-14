@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       .single(),
     supabase
       .from('widget_configs')
-      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, success_heading, success_action_url, success_action_type, success_action_label, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout, success_flow_config, allowed_origins')
+      .select('primary_color, secondary_color, accent_color, font_family, cta_text, success_message, success_heading, success_action_url, success_action_type, success_action_label, redirect_url, custom_css, widget_mode, diagram_type, region_style, widget_layout, success_flow_config, allowed_origins, form_provider, embed_form_url, embed_form_height')
       .eq('tenant_id', tenantId)
       .single(),
   ]);
@@ -401,6 +401,9 @@ export async function GET(request: Request) {
     diagram_type: config.diagram_type || 'full_body',
     region_style: regionStyleOverride || config.region_style || 'diagram',
     widget_layout: layoutOverride || config.widget_layout || 'split',
+    form_provider: (config.form_provider as 'native' | 'embed') || 'native',
+    embed_form_url: config.embed_form_url || null,
+    embed_form_height: config.embed_form_height || 600,
     regions,
     service_categories: serviceCategories,
     form_fields: (formFields && formFields.length > 0) ? deduplicateFormFields(formFields) : DEFAULT_FORM_FIELDS,

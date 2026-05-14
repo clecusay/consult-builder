@@ -32,8 +32,10 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Security headers for all pages (excluding public widget API routes)
-        source: '/((?!api/widget).*)',
+        // Security headers for all pages, excluding:
+        //   - api/widget         (public widget API routes)
+        //   - widget/embed-submitted  (must be iframe-embeddable on any origin)
+        source: '/((?!api/widget|widget/embed-submitted).*)',
         headers: securityHeaders,
       },
     ];

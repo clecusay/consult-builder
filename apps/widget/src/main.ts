@@ -129,9 +129,29 @@ class TreatmentBuilderWidget extends HTMLElement {
   private formError = '';
   private lockedHeight: number | null = null;
 
+  private onEmbedMessage = (event: MessageEvent) => {
+    // Triggered when a third-party form iframe submits and is redirected
+    // to our /widget/embed-submitted page, which posts this signal.
+    const expectedOrigin = this.apiBase
+      ? new URL(this.apiBase).origin
+      : window.location.origin;
+    if (event.origin !== expectedOrigin) return;
+    if (event.data !== 'tb:embed-submitted') return;
+    if (this.view !== 'form') return;
+    const next = this.enabledSuccessViews[0];
+    if (next) {
+      this.view = next;
+      this.render();
+    }
+  };
+
   constructor() {
     super();
     this.shadow = this.attachShadow({ mode: 'closed' });
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('message', this.onEmbedMessage);
   }
 
   async connectedCallback() {
@@ -164,6 +184,11 @@ class TreatmentBuilderWidget extends HTMLElement {
       if (this.config && this.config.regions.length > 0 &&
           this.config.regions.every(r => r.body_area === 'face')) {
         this.diagramView = 'face';
+      }
+
+      // Listen for the third-party form's "submitted" signal.
+      if (this.config?.form_provider === 'embed') {
+        window.addEventListener('message', this.onEmbedMessage);
       }
 
       this.render();
@@ -1187,6 +1212,11 @@ class TreatmentBuilderWidget extends HTMLElement {
   private renderForm(): SafeHTML {
     const cfg = this.config!;
 
+    // Third-party embedded form (HIPAA: submissions go directly to provider).
+    if (cfg.form_provider === 'embed' && cfg.embed_form_url) {
+      return this.renderEmbedForm();
+    }
+
     // Partition fields: opt-in checkboxes vs regular fields
     const isOptIn = (f: WidgetFormField) => f.field_key?.endsWith('_opt_in');
     const contactFields = cfg.form_fields.filter(f => !isOptIn(f));
@@ -1224,6 +1254,40 @@ class TreatmentBuilderWidget extends HTMLElement {
             <button type="submit" class="tb-submit-btn" ${this.submitting ? raw('disabled') : false}>${this.submitting ? 'Submitting...' : cfg.branding.cta_text || 'Request Consultation'}</button>
           </div>
         </form>
+
+        ${this.renderFooter()}
+      </div>
+    `;
+  }
+
+  private renderEmbedForm(): SafeHTML {
+    const cfg = this.config!;
+    const url = cfg.embed_form_url || '';
+    const height = cfg.embed_form_height || 600;
+    return html`
+      <div class="tb-root">
+        <div class="tb-header">
+          <h2>Complete Your Consultation Request</h2>
+          <p>Fill in your details below. We'll reach out to book your consultation.</p>
+        </div>
+
+        ${this.renderStepIndicator()}
+
+        <div class="tb-form-body">
+          <iframe
+            src="${url}"
+            style="width:100%;height:${height}px;border:0;display:block;background:#fff;border-radius:8px"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+            referrerpolicy="no-referrer-when-downgrade"
+            loading="lazy"
+            title="Consultation form"
+          ></iframe>
+
+          <div class="tb-nav">
+            <button type="button" class="tb-back-btn" data-action="back-to-body">${raw(ICONS.chevronLeft)} Back</button>
+            <button type="button" class="tb-back-btn" data-action="embed-continue" style="margin-left:auto">Already submitted? Continue →</button>
+          </div>
+        </div>
 
         ${this.renderFooter()}
       </div>
@@ -1472,6 +1536,13 @@ class TreatmentBuilderWidget extends HTMLElement {
         if (action === 'back-to-body-diagram') { this.diagramView = 'body'; this.render(); return; }
         if (action === 'success-next') {
           const next = this.nextSuccessView(this.view);
+          if (next) { this.view = next; this.render(); }
+          return;
+        }
+        if (action === 'embed-continue') {
+          // Fallback: user clicks "Already submitted? Continue" if the iframe
+          // didn't auto-redirect (provider misconfigured, etc).
+          const next = this.enabledSuccessViews[0];
           if (next) { this.view = next; this.render(); }
           return;
         }

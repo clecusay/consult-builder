@@ -60,6 +60,8 @@ export type RegionStyle = 'diagram' | 'cards';
 
 export type WidgetLayout = 'split' | 'guided';
 
+export type FormProvider = 'native' | 'embed';
+
 export interface WidgetConfig {
   id: string;
   tenant_id: string;
@@ -85,6 +87,9 @@ export interface WidgetConfig {
   region_style: RegionStyle;
   widget_layout: WidgetLayout;
   success_flow_config: SuccessFlowConfig | null;
+  form_provider: FormProvider;
+  embed_form_url: string | null;
+  embed_form_height: number;
   created_at: string;
   updated_at: string;
 }
@@ -316,6 +321,9 @@ export interface WidgetConfigResponse {
   diagram_type: DiagramType;
   region_style: RegionStyle;
   widget_layout: WidgetLayout;
+  form_provider: FormProvider;
+  embed_form_url: string | null;
+  embed_form_height: number;
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];
   form_fields: WidgetFormField[];

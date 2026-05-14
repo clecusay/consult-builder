@@ -25,11 +25,16 @@ import {
   Calendar,
   Stethoscope,
   MapPin,
+  Code,
+  Copy,
+  ShieldCheck,
 } from 'lucide-react';
 import { SaveButton } from '@/components/ui/save-button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { getActiveServices } from '@/lib/queries/services';
+import { updateWidgetConfig } from '@/lib/queries/widget-config';
+import type { FormProvider } from '@treatment-builder/shared';
 
 interface CustomField {
   id: string;
@@ -118,6 +123,13 @@ export default function FormFieldsPage() {
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [dataLoading, setDataLoading] = useState(true);
 
+  // Form provider: 'native' uses our built-in fields below; 'embed' renders a
+  // third-party form (e.g. GHL) in an iframe so submissions never touch our backend.
+  const [formProvider, setFormProvider] = useState<FormProvider>('native');
+  const [embedFormUrl, setEmbedFormUrl] = useState('');
+  const [embedFormHeight, setEmbedFormHeight] = useState(600);
+  const [copied, setCopied] = useState(false);
+
   // Track which presets are enabled
   const [enabledPresets, setEnabledPresets] = useState<Record<string, boolean>>({
     phone: false,
@@ -128,15 +140,27 @@ export default function FormFieldsPage() {
   useEffect(() => {
     if (!tenantId) return;
     async function load() {
-      // Fetch existing form fields
-      const { data: existingFields } = await supabase
-        .from('form_fields')
-        .select('id, field_key, label, field_type, is_required, display_order, options')
-        .eq('tenant_id', tenantId)
-        .order('display_order', { ascending: true });
+      // Fetch existing form fields and widget config (form provider settings) in parallel
+      const [{ data: existingFields }, { data: widgetConfig }, svcList] = await Promise.all([
+        supabase
+          .from('form_fields')
+          .select('id, field_key, label, field_type, is_required, display_order, options')
+          .eq('tenant_id', tenantId)
+          .order('display_order', { ascending: true }),
+        supabase
+          .from('widget_configs')
+          .select('form_provider, embed_form_url, embed_form_height')
+          .eq('tenant_id', tenantId)
+          .single(),
+        getActiveServices(supabase, tenantId!),
+      ]);
 
-      // Fetch active services for this tenant
-      const svcList = await getActiveServices(supabase, tenantId!);
+      if (widgetConfig) {
+        setFormProvider((widgetConfig.form_provider as FormProvider) || 'native');
+        setEmbedFormUrl(widgetConfig.embed_form_url || '');
+        setEmbedFormHeight(widgetConfig.embed_form_height || 600);
+      }
+
       setActiveServices(svcList.map((s) => ({
         ...s,
         category_name: s.category_name ?? 'Uncategorized',
@@ -253,6 +277,17 @@ export default function FormFieldsPage() {
   async function handleSave() {
     if (!tenantId) return;
 
+    // Save form provider settings on widget_configs.
+    await updateWidgetConfig(supabase, tenantId, {
+      form_provider: formProvider,
+      embed_form_url: formProvider === 'embed' ? embedFormUrl.trim() || null : null,
+      embed_form_height: embedFormHeight,
+    });
+
+    // In embed mode the native fields are unused — leave them in place so
+    // switching back to native preserves the practice's prior configuration.
+    if (formProvider === 'embed') return;
+
     // Delete all existing form_fields for this tenant and re-insert
     const { error: delError } = await supabase.from('form_fields').delete().eq('tenant_id', tenantId);
     if (delError) throw new Error(delError.message);
@@ -306,12 +341,159 @@ export default function FormFieldsPage() {
     return <LoadingSpinner />;
   }
 
+  const redirectUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/widget/embed-submitted`
+    : '/widget/embed-submitted';
+
+  async function copyRedirectUrl() {
+    try {
+      await navigator.clipboard.writeText(redirectUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard may be blocked; the user can copy manually.
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Form Fields" description="Configure the consultation form in your widget">
         <SaveButton onSave={handleSave} />
       </PageHeader>
 
+      {/* Form Provider */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Form Provider</CardTitle>
+          <CardDescription>
+            Choose between our built-in form or embed a third-party form (e.g. GHL / aCRM) for HIPAA-friendly direct submission.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setFormProvider('native')}
+              className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+                formProvider === 'native'
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${formProvider === 'native' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Stethoscope className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Native form</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Built-in fields, submissions stored in your dashboard.
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormProvider('embed')}
+              className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+                formProvider === 'embed'
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${formProvider === 'embed' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Code className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Embed third-party form</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  GHL, aCRM, etc. Data goes straight to your provider.
+                </p>
+              </div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {formProvider === 'embed' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Embedded Form Configuration</CardTitle>
+            <CardDescription>
+              Paste the iframe URL of your third-party form and configure the post-submit redirect.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-3">
+              <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-emerald-700" />
+              <div className="text-xs text-emerald-900">
+                <p className="font-medium">HIPAA: form data bypasses our backend.</p>
+                <p className="mt-0.5">Submissions are sent directly from the visitor&apos;s browser to your form provider. We never receive, store, or process PHI from this form.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="embed-url">Form iframe URL</Label>
+              <Input
+                id="embed-url"
+                type="url"
+                value={embedFormUrl}
+                onChange={(e) => setEmbedFormUrl(e.target.value)}
+                placeholder="https://api.leadconnectorhq.com/widget/form/YOUR_FORM_ID"
+                className="text-sm font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                In GHL, open your form &rarr; <span className="font-medium">Integrate</span> &rarr; copy the <span className="font-medium">iframe src</span> URL.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="embed-height">Form height (pixels)</Label>
+              <Input
+                id="embed-height"
+                type="number"
+                min={200}
+                max={2000}
+                value={embedFormHeight}
+                onChange={(e) => setEmbedFormHeight(Number(e.target.value) || 600)}
+                className="text-sm w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                Set this tall enough for your form to render without an inner scrollbar.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Redirect URL (configure in your form provider)</Label>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={redirectUrl}
+                  className="text-sm font-mono"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={copyRedirectUrl}>
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                In your form provider&apos;s settings, set the <span className="font-medium">post-submission redirect URL</span> to the value above. After a visitor submits, the widget will detect the redirect and continue to your thank-you flow.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                If a visitor&apos;s form doesn&apos;t auto-redirect, they can click an &ldquo;Already submitted? Continue&rdquo; link below the form to advance manually.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <NativeFormSections />
+      )}
+    </div>
+  );
+
+  function NativeFormSections() {
+    return (<>
       {/* Default Fields */}
       <Card>
         <CardHeader>
@@ -597,6 +779,6 @@ export default function FormFieldsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
+    </>);
+  }
 }
