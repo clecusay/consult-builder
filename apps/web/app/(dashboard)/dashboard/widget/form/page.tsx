@@ -341,13 +341,16 @@ export default function FormFieldsPage() {
     return <LoadingSpinner />;
   }
 
-  const redirectUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/widget/embed-submitted`
-    : '/widget/embed-submitted';
+  const thankYouSnippet = `<script>
+  try { window.parent.postMessage('tb:embed-submitted', '*'); } catch (e) {}
+</script>
+<div style="padding:24px;text-align:center;color:#475569;font-family:system-ui,-apple-system,sans-serif">
+  Thank you! One moment&hellip;
+</div>`;
 
-  async function copyRedirectUrl() {
+  async function copyThankYouSnippet() {
     try {
-      await navigator.clipboard.writeText(redirectUrl);
+      await navigator.clipboard.writeText(thankYouSnippet);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -464,24 +467,27 @@ export default function FormFieldsPage() {
             <Separator />
 
             <div className="space-y-2">
-              <Label>Redirect URL (configure in your form provider)</Label>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={redirectUrl}
-                  className="text-sm font-mono"
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-                <Button type="button" variant="outline" size="sm" onClick={copyRedirectUrl}>
+              <Label>Post-submit signal (paste into your provider&apos;s &ldquo;Thank You&rdquo; message)</Label>
+              <div className="relative">
+                <pre className="text-xs font-mono bg-slate-900 text-slate-100 rounded-md p-3 overflow-x-auto whitespace-pre">
+{thankYouSnippet}
+                </pre>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyThankYouSnippet}
+                  className="absolute top-2 right-2 bg-white"
+                >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                In your form provider&apos;s settings, set the <span className="font-medium">post-submission redirect URL</span> to the value above. After a visitor submits, the widget will detect the redirect and continue to your thank-you flow.
+                In GHL: open your form &rarr; <span className="font-medium">Settings</span> &rarr; <span className="font-medium">On Submit</span> &rarr; choose <span className="font-medium">Show Thank You Message</span> &rarr; switch the editor to HTML view and paste the snippet above. (Avoid the &ldquo;Redirect to URL&rdquo; option — GHL redirects the whole tab, which breaks the iframe.)
               </p>
               <p className="text-xs text-muted-foreground">
-                If a visitor&apos;s form doesn&apos;t auto-redirect, they can click an &ldquo;Already submitted? Continue&rdquo; link below the form to advance manually.
+                After submit, the snippet runs inside the form iframe, the widget detects it, and advances to your success flow. The &ldquo;Already submitted? Continue&rdquo; link below the form is the manual fallback if something blocks the signal.
               </p>
             </div>
           </CardContent>
