@@ -60,6 +60,10 @@ const DISPLAY_GROUP_LABELS: Record<string, string> = {
 
 const DISPLAY_GROUP_ORDER = ['face', 'upper_body', 'lower_body'];
 
+function safeOrigin(url: string): string | null {
+  try { return new URL(url).origin; } catch { return null; }
+}
+
 /** Search synonyms: maps common search terms to concern names they should match. */
 const SEARCH_SYNONYMS: Record<string, string[]> = {
   'aging': ['wrinkles', 'fine lines', 'loose skin', 'crow\'s feet', 'frown lines', 'eye bags', 'hooded eyelids', 'sagging breasts', 'jowls'],
@@ -130,14 +134,22 @@ class TreatmentBuilderWidget extends HTMLElement {
   private lockedHeight: number | null = null;
 
   private onEmbedMessage = (event: MessageEvent) => {
-    // Triggered when a third-party form iframe submits and is redirected
-    // to our /widget/embed-submitted page, which posts this signal.
-    const expectedOrigin = this.apiBase
-      ? new URL(this.apiBase).origin
-      : window.location.origin;
-    if (event.origin !== expectedOrigin) return;
+    // Fired by either (a) a "Thank You" HTML snippet rendered inside the
+    // form iframe after submission, or (b) our /widget/embed-submitted
+    // bridge page if the provider redirects to it.
     if (event.data !== 'tb:embed-submitted') return;
     if (this.view !== 'form') return;
+
+    // Trust messages from our backend (bridge page) OR from the configured
+    // third-party form's origin (tenant set it; admin-trusted).
+    const ourOrigin = this.apiBase
+      ? new URL(this.apiBase).origin
+      : window.location.origin;
+    const formOrigin = this.config?.embed_form_url
+      ? safeOrigin(this.config.embed_form_url)
+      : null;
+    if (event.origin !== ourOrigin && event.origin !== formOrigin) return;
+
     const next = this.enabledSuccessViews[0];
     if (next) {
       this.view = next;
