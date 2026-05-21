@@ -348,7 +348,7 @@ export default function Home() {
               <span className="text-indigo-400">&lt;script</span>{' '}
               <span className="text-green-400">src</span>
               <span className="text-slate-400">=</span>
-              <span className="text-amber-300">&quot;https://cdn.consultintake.com/widget.js&quot;</span>
+              <span className="text-amber-300">&quot;https://www.consultintake.com/widget.js&quot;</span>
               <br />
               {'  '}
               <span className="text-green-400">data-slug</span>

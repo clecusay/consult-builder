@@ -64,6 +64,15 @@ function safeOrigin(url: string): string | null {
   try { return new URL(url).origin; } catch { return null; }
 }
 
+// Capture the script's own origin at load time — `document.currentScript` is
+// only available during the synchronous execution of the loading script. The
+// widget uses this as the API base when embedded on a third-party site, so
+// practices don't have to remember `data-api`.
+const SCRIPT_ORIGIN: string =
+  (typeof document !== 'undefined' && document.currentScript instanceof HTMLScriptElement
+    ? safeOrigin(document.currentScript.src)
+    : null) ?? '';
+
 /** Search synonyms: maps common search terms to concern names they should match. */
 const SEARCH_SYNONYMS: Record<string, string[]> = {
   'aging': ['wrinkles', 'fine lines', 'loose skin', 'crow\'s feet', 'frown lines', 'eye bags', 'hooded eyelids', 'sagging breasts', 'jowls'],
@@ -178,7 +187,9 @@ class TreatmentBuilderWidget extends HTMLElement {
     const regionStyleOverride = this.getAttribute('data-region-style') || null;
     this.layoutOverride = layoutOverride as 'split' | 'guided' | null;
     this.fullpage = this.hasAttribute('data-fullpage');
-    this.apiBase = this.getAttribute('data-api') || '';
+    // Resolution order: explicit data-api attribute → script's own origin →
+    // same-origin (last only works when widget is hosted on our own domain).
+    this.apiBase = this.getAttribute('data-api') || SCRIPT_ORIGIN || '';
 
     this.shadow.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:96px 16px;color:#64748b;font-size:13px">Loading...</div>';
 
