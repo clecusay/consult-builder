@@ -1296,7 +1296,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         ${this.renderStepIndicator()}
 
-        <div class="tb-form-body">
+        <div class="tb-embed-body">
           <iframe
             src="${url}"
             style="width:100%;height:${height}px;border:0;display:block;background:#fff;border-radius:8px"

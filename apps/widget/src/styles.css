@@ -673,6 +673,18 @@
   flex: 1;
 }
 
+/* Embed form variant — third-party iframe gets the full container width
+   (the form inside the iframe handles its own internal layout). */
+.tb-embed-body {
+  padding: 24px 24px 16px;
+  max-width: 840px;
+  margin: 0 auto;
+  overflow-y: auto;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .tb-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
