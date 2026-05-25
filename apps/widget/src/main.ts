@@ -64,6 +64,35 @@ function safeOrigin(url: string): string | null {
   try { return new URL(url).origin; } catch { return null; }
 }
 
+/**
+ * Categorize where the visitor likely came from, in priority order:
+ * paid click IDs → UTM source → referrer hostname → direct.
+ * Mirrors the heuristic CRMs (GHL, GA) apply when classifying lead sources.
+ */
+function computeSessionSource(params: URLSearchParams, referrer: string): string {
+  if (params.get('gclid')) return 'google';
+  if (params.get('fbclid')) return 'facebook';
+  const utmSource = params.get('utm_source');
+  if (utmSource) return utmSource;
+  if (referrer) {
+    try {
+      const host = new URL(referrer).hostname.toLowerCase();
+      if (host.includes('google.')) return 'google';
+      if (host.includes('facebook.') || host === 'fb.com' || host.endsWith('.fb.com')) return 'facebook';
+      if (host.includes('instagram.')) return 'instagram';
+      if (host.includes('bing.')) return 'bing';
+      if (host.includes('youtube.')) return 'youtube';
+      if (host.includes('linkedin.')) return 'linkedin';
+      if (host.includes('twitter.') || host === 'x.com' || host.endsWith('.x.com')) return 'twitter';
+      if (host.includes('tiktok.')) return 'tiktok';
+      return host.replace(/^www\./, '');
+    } catch {
+      // fall through
+    }
+  }
+  return 'direct';
+}
+
 // Capture the script's own origin at load time — `document.currentScript` is
 // only available during the synchronous execution of the loading script. The
 // widget uses this as the API base when embedded on a third-party site, so
@@ -1283,9 +1312,33 @@ class TreatmentBuilderWidget extends HTMLElement {
     `;
   }
 
+  /**
+   * Append tracking params (utm_*, gclid, fbclid, referrer) from the host page's
+   * URL onto the embed form URL so the third-party form (GHL, etc.) can record
+   * the lead source on its end. Provider-agnostic — any form that reads query
+   * strings will pick these up.
+   */
+  private buildEmbedFormSrc(baseUrl: string): string {
+    try {
+      const url = new URL(baseUrl);
+      const parent = new URLSearchParams(window.location.search);
+      const keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid'];
+      for (const key of keys) {
+        const v = parent.get(key);
+        if (v && !url.searchParams.has(key)) url.searchParams.set(key, v);
+      }
+      if (document.referrer && !url.searchParams.has('referrer')) {
+        url.searchParams.set('referrer', document.referrer);
+      }
+      return url.toString();
+    } catch {
+      return baseUrl;
+    }
+  }
+
   private renderEmbedForm(): SafeHTML {
     const cfg = this.config!;
-    const url = cfg.embed_form_url || '';
+    const url = this.buildEmbedFormSrc(cfg.embed_form_url || '');
     const height = cfg.embed_form_height || 600;
     return html`
       <div class="tb-root">
@@ -1750,13 +1803,17 @@ class TreatmentBuilderWidget extends HTMLElement {
     // Location from form field overrides the data-attribute
     const formLocationId = (fd.get('location_id') as string || '').trim();
 
-    // Extract UTM parameters from the page URL
+    // Extract UTM + click-ID parameters from the page URL
     const urlParams = new URLSearchParams(window.location.search);
     const utmSource = urlParams.get('utm_source') || undefined;
     const utmMedium = urlParams.get('utm_medium') || undefined;
     const utmCampaign = urlParams.get('utm_campaign') || undefined;
     const utmContent = urlParams.get('utm_content') || undefined;
     const utmTerm = urlParams.get('utm_term') || undefined;
+    const gclid = urlParams.get('gclid') || undefined;
+    const fbclid = urlParams.get('fbclid') || undefined;
+    const referrer = document.referrer || undefined;
+    const sessionSource = computeSessionSource(urlParams, document.referrer || '');
 
     const payload: Record<string, unknown> = {
       tenant_id: this.tenantId,
@@ -1771,12 +1828,16 @@ class TreatmentBuilderWidget extends HTMLElement {
       selected_concerns: selectedConcerns,
       selected_services: selectedServices,
       custom_fields: customFields,
-      source_url: window.location.origin + window.location.pathname,
+      source_url: window.location.href,
       utm_source: utmSource,
       utm_medium: utmMedium,
       utm_campaign: utmCampaign,
       utm_content: utmContent,
       utm_term: utmTerm,
+      gclid,
+      fbclid,
+      referrer,
+      session_source: sessionSource,
       sms_opt_in: optInValues.communication_opt_in || optInValues.sms_opt_in || false,
       email_opt_in: optInValues.communication_opt_in || optInValues.email_opt_in || false,
     };
@@ -1812,14 +1873,72 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.render();
 
     try {
-      const res = await fetch(`${this.apiBase}/api/widget/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Submission failed (${res.status})`);
+      const useDirectWebhook =
+        this.config.submission_target === 'webhook_direct' &&
+        !!this.config.crm_webhook_url;
+
+      if (useDirectWebhook) {
+        // Browser → CRM webhook directly. Our backend never sees the
+        // submission, so PHI stays out of our infra. Payload is reshaped
+        // to flat fields that map cleanly to CRM custom fields, with the
+        // original nested structures kept for advanced mapping.
+        const directPayload = {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          email: payload.email,
+          phone: payload.phone,
+          date_of_birth: payload.date_of_birth,
+          gender: payload.gender,
+
+          // Flattened selection summaries — easy to drop into CRM fields
+          regions_summary: selectedRegions.map(r => r.region_name).join(', '),
+          concerns_summary: selectedConcerns.map(c => c.concern_name).join(', '),
+          services_summary: selectedServices.map(s => s.service_name).join(', '),
+
+          // Raw selections for tenants who want structured access
+          selected_regions: selectedRegions.map(r => ({ name: r.region_name, slug: r.region_slug })),
+          selected_concerns: selectedConcerns.map(c => ({ name: c.concern_name, region: c.region_name })),
+          selected_services: selectedServices.map(s => ({ name: s.service_name, category: s.category_name })),
+          custom_fields: customFields,
+
+          // Attribution
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign,
+          utm_content: utmContent,
+          utm_term: utmTerm,
+          gclid,
+          fbclid,
+          source_url: window.location.href,
+          referrer,
+          session_source: sessionSource,
+
+          // Consent
+          sms_opt_in: payload.sms_opt_in,
+          email_opt_in: payload.email_opt_in,
+
+          // Treatment builder bundle (if present)
+          ...(payload.treatment_builder ? { treatment_builder: payload.treatment_builder } : {}),
+        };
+
+        const res = await fetch(this.config.crm_webhook_url!, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(directPayload),
+        });
+        if (!res.ok) {
+          throw new Error(`Submission failed (${res.status})`);
+        }
+      } else {
+        const res = await fetch(`${this.apiBase}/api/widget/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Submission failed (${res.status})`);
+        }
       }
       // Lock the height so the success flow doesn't collapse
       const root = this.shadow.querySelector('.tb-root') as HTMLElement | null;

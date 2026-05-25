@@ -34,7 +34,7 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { getActiveServices } from '@/lib/queries/services';
 import { updateWidgetConfig } from '@/lib/queries/widget-config';
-import type { FormProvider } from '@treatment-builder/shared';
+import type { FormProvider, SubmissionTarget } from '@treatment-builder/shared';
 
 interface CustomField {
   id: string;
@@ -130,6 +130,12 @@ export default function FormFieldsPage() {
   const [embedFormHeight, setEmbedFormHeight] = useState(600);
   const [copied, setCopied] = useState(false);
 
+  // Submission target (native form only): 'backend' sends to our backend (default,
+  // submissions logged + webhook fan-out); 'webhook_direct' has the browser POST
+  // straight to the CRM webhook so PHI never touches our infrastructure.
+  const [submissionTarget, setSubmissionTarget] = useState<SubmissionTarget>('backend');
+  const [crmWebhookUrl, setCrmWebhookUrl] = useState('');
+
   // Track which presets are enabled
   const [enabledPresets, setEnabledPresets] = useState<Record<string, boolean>>({
     phone: false,
@@ -149,7 +155,7 @@ export default function FormFieldsPage() {
           .order('display_order', { ascending: true }),
         supabase
           .from('widget_configs')
-          .select('form_provider, embed_form_url, embed_form_height')
+          .select('form_provider, embed_form_url, embed_form_height, submission_target, crm_webhook_url')
           .eq('tenant_id', tenantId)
           .single(),
         getActiveServices(supabase, tenantId!),
@@ -159,6 +165,8 @@ export default function FormFieldsPage() {
         setFormProvider((widgetConfig.form_provider as FormProvider) || 'native');
         setEmbedFormUrl(widgetConfig.embed_form_url || '');
         setEmbedFormHeight(widgetConfig.embed_form_height || 600);
+        setSubmissionTarget((widgetConfig.submission_target as SubmissionTarget) || 'backend');
+        setCrmWebhookUrl(widgetConfig.crm_webhook_url || '');
       }
 
       setActiveServices(svcList.map((s) => ({
@@ -277,11 +285,16 @@ export default function FormFieldsPage() {
   async function handleSave() {
     if (!tenantId) return;
 
-    // Save form provider settings on widget_configs.
+    // Save form provider + submission target settings on widget_configs.
     await updateWidgetConfig(supabase, tenantId, {
       form_provider: formProvider,
       embed_form_url: formProvider === 'embed' ? embedFormUrl.trim() || null : null,
       embed_form_height: embedFormHeight,
+      submission_target: formProvider === 'native' ? submissionTarget : 'backend',
+      crm_webhook_url:
+        formProvider === 'native' && submissionTarget === 'webhook_direct'
+          ? crmWebhookUrl.trim() || null
+          : null,
     });
 
     // In embed mode the native fields are unused — leave them in place so
@@ -500,6 +513,112 @@ export default function FormFieldsPage() {
 
   function NativeFormSections() {
     return (<>
+      {/* Submission Target */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Submission Destination</CardTitle>
+          <CardDescription>
+            Choose where the form data is sent when a visitor submits.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setSubmissionTarget('backend')}
+              className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+                submissionTarget === 'backend'
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${submissionTarget === 'backend' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Stethoscope className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Backend (default)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Stored in your dashboard. Optional outbound webhook fan-out.
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmissionTarget('webhook_direct')}
+              className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+                submissionTarget === 'webhook_direct'
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${submissionTarget === 'webhook_direct' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Code className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Direct to CRM webhook</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Visitor&apos;s browser POSTs straight to your CRM. Bypasses our backend.
+                </p>
+              </div>
+            </button>
+          </div>
+
+          {submissionTarget === 'webhook_direct' && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-3">
+                <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-emerald-700" />
+                <div className="text-xs text-emerald-900">
+                  <p className="font-medium">HIPAA: form data bypasses our backend.</p>
+                  <p className="mt-0.5">Submissions are sent directly from the visitor&apos;s browser to your CRM webhook. We never receive, store, or process the data. Submissions will not appear in your Submissions tab; check your CRM for them.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="crm-webhook-url">CRM webhook URL</Label>
+                <Input
+                  id="crm-webhook-url"
+                  type="url"
+                  value={crmWebhookUrl}
+                  onChange={(e) => setCrmWebhookUrl(e.target.value)}
+                  placeholder="https://services.leadconnectorhq.com/hooks/.../webhook-trigger/..."
+                  className="text-sm font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  In GHL: <span className="font-medium">Automations</span> &rarr; create a workflow with an <span className="font-medium">Inbound Webhook</span> trigger &rarr; copy the URL. The webhook must accept CORS POSTs (GHL&apos;s do by default).
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Payload your webhook will receive</Label>
+                <pre className="text-xs font-mono bg-slate-900 text-slate-100 rounded-md p-3 overflow-x-auto whitespace-pre">
+{`{
+  "first_name": "...",
+  "last_name": "...",
+  "email": "...",
+  "phone": "...",
+  "regions_summary": "Lower Face, Neck",
+  "concerns_summary": "Jowls, Loose skin",
+  "selected_regions": [...],
+  "selected_concerns": [...],
+  "utm_source": "...", "utm_medium": "...",
+  "utm_campaign": "...", "utm_content": "...", "utm_term": "...",
+  "gclid": "...", "fbclid": "...",
+  "source_url": "...", "referrer": "...",
+  "session_source": "...",
+  "sms_opt_in": true, "email_opt_in": true
+}`}
+                </pre>
+                <p className="text-xs text-muted-foreground">
+                  Map these to your CRM custom fields in the workflow&apos;s inbound webhook trigger. Field names match what&apos;s shown above.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Default Fields */}
       <Card>
         <CardHeader>

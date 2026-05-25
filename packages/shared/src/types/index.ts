@@ -62,6 +62,8 @@ export type WidgetLayout = 'split' | 'guided';
 
 export type FormProvider = 'native' | 'embed';
 
+export type SubmissionTarget = 'backend' | 'webhook_direct';
+
 export interface WidgetConfig {
   id: string;
   tenant_id: string;
@@ -90,6 +92,8 @@ export interface WidgetConfig {
   form_provider: FormProvider;
   embed_form_url: string | null;
   embed_form_height: number;
+  submission_target: SubmissionTarget;
+  crm_webhook_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -324,6 +328,8 @@ export interface WidgetConfigResponse {
   form_provider: FormProvider;
   embed_form_url: string | null;
   embed_form_height: number;
+  submission_target: SubmissionTarget;
+  crm_webhook_url: string | null;
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];
   form_fields: WidgetFormField[];
