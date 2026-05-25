@@ -6,7 +6,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' https: wss://*.supabase.co",
   "frame-src 'self' https:",
   "frame-ancestors 'self'",
   "base-uri 'self'",
