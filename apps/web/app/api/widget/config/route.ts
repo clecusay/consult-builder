@@ -99,7 +99,7 @@ export async function GET(request: Request) {
     // [0] tenant locations list
     supabase
       .from('tenant_locations')
-      .select('id, name, is_primary, city, state')
+      .select('id, slug, name, is_primary, city, state')
       .eq('tenant_id', tenant.id)
       .order('is_primary', { ascending: false })
       .order('name'),
@@ -409,7 +409,7 @@ export async function GET(request: Request) {
     regions,
     service_categories: serviceCategories,
     form_fields: (formFields && formFields.length > 0) ? deduplicateFormFields(formFields) : DEFAULT_FORM_FIELDS,
-    locations: (tenantLocations || []).map(loc => ({ id: loc.id, name: loc.name, is_primary: loc.is_primary, city: loc.city, state: loc.state })),
+    locations: (tenantLocations || []).map(loc => ({ id: loc.id, slug: loc.slug || null, name: loc.name, is_primary: loc.is_primary, city: loc.city, state: loc.state })),
   };
 
   const origin = getCorsOrigin(request, config.allowed_origins as string[] | null);

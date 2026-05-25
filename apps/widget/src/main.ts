@@ -1959,11 +1959,14 @@ class TreatmentBuilderWidget extends HTMLElement {
 
       if (useDirectWebhook) {
         // Resolve the selected location (form field overrides data attribute)
-        // into both ID and human-readable name for CRM mapping.
-        const resolvedLocationId = formLocationId || this.locationId || undefined;
-        const resolvedLocation = resolvedLocationId
-          ? this.config.locations.find(l => l.id === resolvedLocationId)
+        // into slug, UUID, and human-readable name for CRM mapping.
+        const resolvedLocationUuid = formLocationId || this.locationId || undefined;
+        const resolvedLocation = resolvedLocationUuid
+          ? this.config.locations.find(l => l.id === resolvedLocationUuid)
           : undefined;
+        // Prefer the configured slug (e.g. "oklahoma_city") as the canonical
+        // location_id for CRM mapping. Falls back to the UUID if no slug set.
+        const resolvedLocationId = resolvedLocation?.slug || resolvedLocationUuid;
         const locationName = resolvedLocation
           ? [resolvedLocation.name, resolvedLocation.city, resolvedLocation.state].filter(Boolean).join(', ')
           : undefined;
@@ -1980,6 +1983,7 @@ class TreatmentBuilderWidget extends HTMLElement {
           date_of_birth: payload.date_of_birth,
           gender: payload.gender,
           location_id: resolvedLocationId,
+          location_uuid: resolvedLocationUuid,
           location_name: locationName,
 
           // Flattened selection summaries — easy to drop into CRM fields

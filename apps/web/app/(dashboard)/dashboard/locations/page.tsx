@@ -33,6 +33,7 @@ import { getActiveServices } from '@/lib/queries/services';
 interface Location {
   id: string;
   name: string;
+  slug: string;
   address: string;
   city: string;
   state: string;
@@ -64,13 +65,14 @@ export default function LocationsPage() {
       // Load locations
       const { data: locs } = await supabase
         .from('tenant_locations')
-        .select('id, name, address, city, state, zip, phone, is_primary')
+        .select('id, name, slug, address, city, state, zip, phone, is_primary')
         .eq('tenant_id', tenantId)
         .order('is_primary', { ascending: false });
 
       const allLocs = (locs ?? []).map((l) => ({
         id: l.id,
         name: l.name ?? '',
+        slug: l.slug ?? '',
         address: l.address ?? '',
         city: l.city ?? '',
         state: l.state ?? '',
@@ -123,6 +125,7 @@ export default function LocationsPage() {
       {
         id: `new-${Date.now()}`,
         name: '',
+        slug: '',
         address: '',
         city: '',
         state: '',
@@ -195,6 +198,7 @@ export default function LocationsPage() {
         .from('tenant_locations')
         .update({
           name: loc.name.trim(),
+          slug: loc.slug.trim() || null,
           address: loc.address.trim() || null,
           city: loc.city.trim() || null,
           state: loc.state.trim() || null,
@@ -212,6 +216,7 @@ export default function LocationsPage() {
       const insertRows = toInsert.map((l) => ({
         tenant_id: tenantId,
         name: l.name.trim(),
+        slug: l.slug.trim() || null,
         address: l.address.trim() || null,
         city: l.city.trim() || null,
         state: l.state.trim() || null,
@@ -275,7 +280,7 @@ export default function LocationsPage() {
       .order('is_primary', { ascending: false })
       .order('name');
     if (refreshed) {
-      setLocations(refreshed.map((l) => ({ ...l, address: l.address || '', city: l.city || '', state: l.state || '', zip: l.zip || '', phone: l.phone || '' })));
+      setLocations(refreshed.map((l) => ({ ...l, slug: l.slug || '', address: l.address || '', city: l.city || '', state: l.state || '', zip: l.zip || '', phone: l.phone || '' })));
     }
   }
 
@@ -377,6 +382,30 @@ export default function LocationsPage() {
 
                 {isExpanded && (
                   <CardContent className="pt-0 space-y-4">
+                    <Separator />
+
+                    {/* Slug — stable ID for CRM mapping */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Slug (used as <code className="px-1 bg-slate-100 rounded">location_id</code> in CRM webhook)</Label>
+                      <Input
+                        value={loc.slug}
+                        onChange={(e) =>
+                          updateLocation(loc.id, {
+                            // Normalize to lowercase + safe characters as the user types
+                            slug: e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9_-]+/g, '_')
+                              .replace(/^_+|_+$/g, ''),
+                          })
+                        }
+                        placeholder="oklahoma_city"
+                        className="text-sm font-mono max-w-xs"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Stable identifier sent to your CRM (e.g. <code className="px-1 bg-slate-100 rounded">oklahoma_city</code>, <code className="px-1 bg-slate-100 rounded">jacksonville</code>). Lowercase letters, numbers, underscores, hyphens. Must be unique within your account.
+                      </p>
+                    </div>
+
                     <Separator />
 
                     {/* Address fields */}

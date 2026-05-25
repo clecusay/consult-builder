@@ -28,6 +28,7 @@ export interface TenantLocation {
   id: string;
   tenant_id: string;
   name: string;
+  slug: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -338,6 +339,7 @@ export interface WidgetConfigResponse {
 
 export interface WidgetLocation {
   id: string;
+  slug: string | null;
   name: string;
   is_primary: boolean;
   city: string | null;
