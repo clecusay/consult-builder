@@ -605,13 +605,30 @@ export default function FormFieldsPage() {
   "utm_source": "...", "utm_medium": "...",
   "utm_campaign": "...", "utm_content": "...", "utm_term": "...",
   "gclid": "...", "fbclid": "...",
-  "source_url": "...", "referrer": "...",
-  "session_source": "...",
+  "source_url": "...",           // page where they submitted
+  "landing_page": "...",         // first page of session (with UTMs)
+  "referrer": "...",             // referrer at session start
+  "session_source": "Paid Search",   // one of: Paid Search, Social media,
+                                  //          Email Marketing, Organic Search,
+                                  //          Referral, Direct traffic
   "sms_opt_in": true, "email_opt_in": true
 }`}
                 </pre>
                 <p className="text-xs text-muted-foreground">
-                  Map these to your CRM custom fields in the workflow&apos;s inbound webhook trigger. Field names match what&apos;s shown above.
+                  Map these to your CRM custom fields in the workflow&apos;s inbound webhook trigger. Field names match what&apos;s shown above. <span className="font-medium">session_source</span> already maps to GHL&apos;s &ldquo;First/Last Attribution Session Source&rdquo; dropdown values directly.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Cross-page attribution (recommended)</Label>
+                <p className="text-xs text-muted-foreground">
+                  If visitors land on one page (e.g. <code className="px-1 bg-slate-100 rounded">/spring-offer?utm_source=google</code>) and click through to a clean URL where the widget lives, UTMs are lost from the URL by the time they submit. Install this one-line helper in the <code className="px-1 bg-slate-100 rounded">&lt;head&gt;</code> of every page on your site to preserve them for the full session:
+                </p>
+                <pre className="text-xs font-mono bg-slate-900 text-slate-100 rounded-md p-3 overflow-x-auto whitespace-pre">{`<script src="https://www.consultintake.com/track.js" defer></script>`}</pre>
+                <p className="text-xs text-muted-foreground">
+                  The helper captures UTMs, click IDs, referrer, and landing page on the visitor&apos;s <span className="font-medium">first</span> page of a browser session and stores them in <code className="px-1 bg-slate-100 rounded">sessionStorage</code>. The widget reads from there first, falling back to the current URL otherwise. Safe to install everywhere — does nothing harmful if visitors don&apos;t reach the widget.
                 </p>
               </div>
             </div>

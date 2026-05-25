@@ -64,33 +64,110 @@ function safeOrigin(url: string): string | null {
   try { return new URL(url).origin; } catch { return null; }
 }
 
+interface Attribution {
+  utm_source: string | undefined;
+  utm_medium: string | undefined;
+  utm_campaign: string | undefined;
+  utm_content: string | undefined;
+  utm_term: string | undefined;
+  gclid: string | undefined;
+  fbclid: string | undefined;
+  referrer: string | undefined;
+  landing_page: string | undefined;
+}
+
 /**
- * Categorize where the visitor likely came from, in priority order:
- * paid click IDs → UTM source → referrer hostname → direct.
- * Mirrors the heuristic CRMs (GHL, GA) apply when classifying lead sources.
+ * Read attribution data captured by the site-wide track.js helper. Returns
+ * an empty record if nothing is stored — caller is responsible for falling
+ * back to the current URL.
  */
-function computeSessionSource(params: URLSearchParams, referrer: string): string {
-  if (params.get('gclid')) return 'google';
-  if (params.get('fbclid')) return 'facebook';
-  const utmSource = params.get('utm_source');
-  if (utmSource) return utmSource;
-  if (referrer) {
+function readStoredAttribution(): Partial<Attribution> {
+  try {
+    if (typeof sessionStorage === 'undefined') return {};
+    const raw = sessionStorage.getItem('tb_attribution');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const pick = (k: string) =>
+      typeof parsed[k] === 'string' && parsed[k] ? (parsed[k] as string) : undefined;
+    return {
+      utm_source: pick('utm_source'),
+      utm_medium: pick('utm_medium'),
+      utm_campaign: pick('utm_campaign'),
+      utm_content: pick('utm_content'),
+      utm_term: pick('utm_term'),
+      gclid: pick('gclid'),
+      fbclid: pick('fbclid'),
+      referrer: pick('referrer'),
+      landing_page: pick('landing_page'),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Merge stored (cross-page) attribution with the current page's URL/referrer.
+ * Stored values from the visitor's first session page take precedence so a
+ * journey like /spring-offer?utm_source=google → /consult → submit still
+ * reports the original google source even though the URL has lost the param.
+ */
+function getAttribution(): Attribution {
+  const stored = readStoredAttribution();
+  const url = new URLSearchParams(window.location.search);
+  const pick = (key: keyof Attribution, fallback?: string) =>
+    stored[key] || url.get(key as string) || fallback || undefined;
+  return {
+    utm_source: pick('utm_source'),
+    utm_medium: pick('utm_medium'),
+    utm_campaign: pick('utm_campaign'),
+    utm_content: pick('utm_content'),
+    utm_term: pick('utm_term'),
+    gclid: pick('gclid'),
+    fbclid: pick('fbclid'),
+    referrer: stored.referrer || document.referrer || undefined,
+    landing_page: stored.landing_page || window.location.href,
+  };
+}
+
+/**
+ * Categorize where the visitor likely came from into the six values both of
+ * GHL's "First/Last Attribution Session Source" dropdowns share:
+ *   Paid Search, Social media, Email Marketing, Organic Search, Referral, Direct traffic.
+ *
+ * Priority: paid click IDs → paid UTM medium → social signals → email signals →
+ * organic search referrers → other external referrer → direct.
+ */
+function computeSessionSource(a: Attribution): string {
+  const utmMedium = (a.utm_medium || '').toLowerCase();
+  const utmSource = (a.utm_source || '').toLowerCase();
+  const SOCIAL_SOURCES = ['facebook', 'fb', 'instagram', 'ig', 'twitter', 'x', 'linkedin', 'tiktok', 'pinterest', 'reddit', 'snapchat', 'youtube'];
+  const PAID_MEDIUMS = ['cpc', 'ppc', 'paid', 'paidsearch', 'paid-search'];
+  const SOCIAL_MEDIUMS = ['social', 'paid-social', 'paidsocial', 'social-paid'];
+
+  if (a.gclid) return 'Paid Search';
+  if (PAID_MEDIUMS.includes(utmMedium)) return 'Paid Search';
+
+  if (a.fbclid) return 'Social media';
+  if (SOCIAL_SOURCES.includes(utmSource)) return 'Social media';
+  if (SOCIAL_MEDIUMS.includes(utmMedium)) return 'Social media';
+
+  if (utmMedium === 'email' || utmSource === 'email' || utmSource === 'newsletter') return 'Email Marketing';
+
+  if (utmMedium === 'organic' || utmMedium === 'organic-search') return 'Organic Search';
+
+  if (a.referrer) {
     try {
-      const host = new URL(referrer).hostname.toLowerCase();
-      if (host.includes('google.')) return 'google';
-      if (host.includes('facebook.') || host === 'fb.com' || host.endsWith('.fb.com')) return 'facebook';
-      if (host.includes('instagram.')) return 'instagram';
-      if (host.includes('bing.')) return 'bing';
-      if (host.includes('youtube.')) return 'youtube';
-      if (host.includes('linkedin.')) return 'linkedin';
-      if (host.includes('twitter.') || host === 'x.com' || host.endsWith('.x.com')) return 'twitter';
-      if (host.includes('tiktok.')) return 'tiktok';
-      return host.replace(/^www\./, '');
+      const host = new URL(a.referrer).hostname.toLowerCase();
+      if (/(^|\.)(google|bing|duckduckgo|yahoo|yandex|ecosia|baidu)\.[a-z.]+$/i.test(host)) return 'Organic Search';
+      if (/(^|\.)(facebook|instagram|tiktok|linkedin|pinterest|reddit|youtube|twitter|x|snapchat|t)\.[a-z.]+$/i.test(host)) return 'Social media';
+      if (host === 'fb.com' || host === 'x.com' || host.endsWith('.fb.com') || host.endsWith('.x.com')) return 'Social media';
+      return 'Referral';
     } catch {
       // fall through
     }
   }
-  return 'direct';
+
+  return 'Direct traffic';
 }
 
 // Capture the script's own origin at load time — `document.currentScript` is
@@ -1803,17 +1880,20 @@ class TreatmentBuilderWidget extends HTMLElement {
     // Location from form field overrides the data-attribute
     const formLocationId = (fd.get('location_id') as string || '').trim();
 
-    // Extract UTM + click-ID parameters from the page URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const utmSource = urlParams.get('utm_source') || undefined;
-    const utmMedium = urlParams.get('utm_medium') || undefined;
-    const utmCampaign = urlParams.get('utm_campaign') || undefined;
-    const utmContent = urlParams.get('utm_content') || undefined;
-    const utmTerm = urlParams.get('utm_term') || undefined;
-    const gclid = urlParams.get('gclid') || undefined;
-    const fbclid = urlParams.get('fbclid') || undefined;
-    const referrer = document.referrer || undefined;
-    const sessionSource = computeSessionSource(urlParams, document.referrer || '');
+    // Attribution: merges site-wide track.js stored data (first-touch within
+    // this session) with the current page's URL, so multi-page journeys still
+    // report the original UTMs.
+    const attribution = getAttribution();
+    const utmSource = attribution.utm_source;
+    const utmMedium = attribution.utm_medium;
+    const utmCampaign = attribution.utm_campaign;
+    const utmContent = attribution.utm_content;
+    const utmTerm = attribution.utm_term;
+    const gclid = attribution.gclid;
+    const fbclid = attribution.fbclid;
+    const referrer = attribution.referrer;
+    const landingPage = attribution.landing_page;
+    const sessionSource = computeSessionSource(attribution);
 
     const payload: Record<string, unknown> = {
       tenant_id: this.tenantId,
@@ -1901,7 +1981,9 @@ class TreatmentBuilderWidget extends HTMLElement {
           selected_services: selectedServices.map(s => ({ name: s.service_name, category: s.category_name })),
           custom_fields: customFields,
 
-          // Attribution
+          // Attribution — utm/click-IDs/referrer/landing_page come from
+          // track.js stored on first session page when available; falls back
+          // to current URL otherwise.
           utm_source: utmSource,
           utm_medium: utmMedium,
           utm_campaign: utmCampaign,
@@ -1910,6 +1992,7 @@ class TreatmentBuilderWidget extends HTMLElement {
           gclid,
           fbclid,
           source_url: window.location.href,
+          landing_page: landingPage,
           referrer,
           session_source: sessionSource,
 
