@@ -1958,6 +1958,16 @@ class TreatmentBuilderWidget extends HTMLElement {
         !!this.config.crm_webhook_url;
 
       if (useDirectWebhook) {
+        // Resolve the selected location (form field overrides data attribute)
+        // into both ID and human-readable name for CRM mapping.
+        const resolvedLocationId = formLocationId || this.locationId || undefined;
+        const resolvedLocation = resolvedLocationId
+          ? this.config.locations.find(l => l.id === resolvedLocationId)
+          : undefined;
+        const locationName = resolvedLocation
+          ? [resolvedLocation.name, resolvedLocation.city, resolvedLocation.state].filter(Boolean).join(', ')
+          : undefined;
+
         // Browser → CRM webhook directly. Our backend never sees the
         // submission, so PHI stays out of our infra. Payload is reshaped
         // to flat fields that map cleanly to CRM custom fields, with the
@@ -1969,6 +1979,8 @@ class TreatmentBuilderWidget extends HTMLElement {
           phone: payload.phone,
           date_of_birth: payload.date_of_birth,
           gender: payload.gender,
+          location_id: resolvedLocationId,
+          location_name: locationName,
 
           // Flattened selection summaries — easy to drop into CRM fields
           regions_summary: selectedRegions.map(r => r.region_name).join(', '),

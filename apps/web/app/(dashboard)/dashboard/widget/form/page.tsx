@@ -598,6 +598,9 @@ export default function FormFieldsPage() {
   "last_name": "...",
   "email": "...",
   "phone": "...",
+  "gender": "female",
+  "location_id": "...",          // UUID of selected location (if any)
+  "location_name": "Main, Oklahoma City, OK",
   "regions_summary": "Lower Face, Neck",
   "concerns_summary": "Jowls, Loose skin",
   "selected_regions": [...],
