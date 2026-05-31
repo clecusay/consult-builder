@@ -650,17 +650,53 @@
   height: 14px;
 }
 
-/* --- Mobile Summary --- */
+/* --- Mobile Bottom Sheet (split layout) --- */
+/* The handle, grabber and scrim only exist for the mobile bottom-sheet
+   treatment; on desktop the panel is a static column, so they stay hidden. */
 
-.tb-mobile-summary {
-  padding: 8px 16px;
-  border-bottom: 1px solid #d8dce1;
-  background: #f8fafc;
-  text-align: center;
-  font-size: 11px;
-  color: #475569;
-  font-weight: 500;
+.tb-sheet-handle,
+.tb-sheet-scrim {
   display: none;
+}
+
+.tb-sheet-grabber {
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  margin: 0 auto 8px;
+}
+
+.tb-sheet-handle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tb-sheet-handle-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.tb-sheet-chevron {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  color: #94a3b8;
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
+.tb-sheet-chevron svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tb-panel-col.open .tb-sheet-chevron {
+  transform: rotate(0deg);
 }
 
 /* --- Form --- */
@@ -1326,23 +1362,73 @@
 /* --- Responsive --- */
 
 @media (max-width: 600px) {
+  /* Body takes the full width and becomes the primary surface; the concerns
+     panel turns into a bottom sheet that overlays it (absolute, so expanding
+     it never grows the container height). */
   .tb-split {
     flex-direction: column;
     max-height: none;
+    position: relative;
   }
 
   .tb-diagram-col {
     border-right: none;
-    border-bottom: 1px solid #d8dce1;
-    max-height: 320px;
+    border-bottom: none;
+    min-height: 62vh;
+    padding-bottom: 64px; /* room for the collapsed sheet peek */
+  }
+
+  /* Keep the gender toggle above the collapsed sheet peek (~56px). */
+  .tb-gender-switch {
+    bottom: 70px;
+  }
+
+  .tb-sheet-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.32);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 6;
+  }
+
+  .tb-sheet-scrim.open {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .tb-panel-col {
-    max-height: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 85%;
+    background: #fff;
+    border-top: 1px solid #d8dce1;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(calc(100% - 56px));
+    transition: transform 0.3s ease;
+    z-index: 7;
   }
 
-  .tb-mobile-summary {
+  .tb-panel-col.open {
+    transform: translateY(0);
+  }
+
+  .tb-sheet-handle {
     display: block;
+    width: 100%;
+    padding: 8px 16px 10px;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
   }
 
   .tb-form-grid {

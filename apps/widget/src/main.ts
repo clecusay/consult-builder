@@ -244,6 +244,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   // UI state
   private expandedRegions = new Set<string>();
   private concernSearchQuery = '';
+  private mobileSheetOpen = false;
   private submitting = false;
   private formError = '';
   private lockedHeight: number | null = null;
@@ -462,6 +463,9 @@ class TreatmentBuilderWidget extends HTMLElement {
         this.expandedRegions.add(slug);
       }
     }
+    // On mobile the panel is a bottom sheet; pop it open as soon as the
+    // patient has at least one area selected, collapse it when none remain.
+    this.mobileSheetOpen = this.selectedRegionSlugs.size > 0;
     this.render();
   }
 
@@ -472,6 +476,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     if (region) {
       region.concerns.forEach(c => this.selectedConcernIds.delete(c.id));
     }
+    if (this.selectedRegionSlugs.size === 0) this.mobileSheetOpen = false;
     this.render();
   }
 
@@ -569,6 +574,14 @@ class TreatmentBuilderWidget extends HTMLElement {
       const countText = total > 0 ? ` (${total})` : '';
       continueBtn.innerHTML = `Continue${countText} ${ICONS.chevronRight}`;
     }
+    // Keep the summary bar and the mobile sheet peek header counts in sync
+    // (these also change on a targeted toggle, not just a full render).
+    const areas = this.selectedRegionSlugs.size;
+    const summaryText = `${areas} area${areas !== 1 ? 's' : ''} · ${total} concern${total !== 1 ? 's' : ''} selected`;
+    const summaryEl = this.shadow.querySelector<HTMLElement>('.tb-summary-text');
+    if (summaryEl) summaryEl.textContent = summaryText;
+    const handleEl = this.shadow.querySelector<HTMLElement>('.tb-sheet-handle-text');
+    if (handleEl) handleEl.textContent = areas > 0 ? summaryText : 'Select a body area';
   }
 
   private setGender(g: 'female' | 'male') {
@@ -580,6 +593,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.selectedConcernIds.clear();
     this.expandedRegions.clear();
     this.concernSearchQuery = '';
+    this.mobileSheetOpen = false;
     this.render();
   }
 
@@ -595,6 +609,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.selectedServiceIds.clear();
     this.expandedRegions.clear();
     this.concernSearchQuery = '';
+    this.mobileSheetOpen = false;
     this.formError = '';
     this.selectedPainPoints.clear();
     this.selectedOutcomes.clear();
@@ -801,11 +816,20 @@ class TreatmentBuilderWidget extends HTMLElement {
             </div>
           </div>
 
-          ${this.selectedRegionSlugs.size > 0
-            ? html`<div class="tb-mobile-summary">${this.selectedRegionSlugs.size} area${this.selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; ${this.selectedConcernIds.size} concern${this.selectedConcernIds.size !== 1 ? 's' : ''}</div>`
-            : false}
+          <div class="tb-sheet-scrim${this.mobileSheetOpen ? ' open' : ''}" data-action="close-sheet"></div>
 
-          <div class="tb-panel-col">
+          <div class="tb-panel-col${this.mobileSheetOpen ? ' open' : ''}">
+            <button class="tb-sheet-handle" data-action="toggle-sheet" aria-label="Toggle concerns panel">
+              <span class="tb-sheet-grabber"></span>
+              <span class="tb-sheet-handle-row">
+                <span class="tb-sheet-handle-text">
+                  ${this.selectedRegionSlugs.size > 0
+                    ? html`${this.selectedRegionSlugs.size} area${this.selectedRegionSlugs.size !== 1 ? 's' : ''} &middot; ${this.totalSelections} concern${this.totalSelections !== 1 ? 's' : ''} selected`
+                    : 'Select a body area'}
+                </span>
+                <span class="tb-sheet-chevron">${raw(ICONS.chevronDown)}</span>
+              </span>
+            </button>
             ${this.renderPanel()}
           </div>
         </div>
@@ -1701,6 +1725,18 @@ class TreatmentBuilderWidget extends HTMLElement {
         }
         if (action === 'reset' || action === 'reset-footer') { this.reset(); return; }
         if (action === 'clear-search') { this.concernSearchQuery = ''; this.render(); return; }
+
+        // Mobile bottom sheet open/close — toggle classes directly so the
+        // slide transition animates (a full re-render would recreate the node
+        // already in its target state, skipping the transition).
+        if (action === 'toggle-sheet' || action === 'close-sheet') {
+          this.mobileSheetOpen = action === 'toggle-sheet' ? !this.mobileSheetOpen : false;
+          const panel = root.querySelector<HTMLElement>('.tb-panel-col');
+          const scrim = root.querySelector<HTMLElement>('.tb-sheet-scrim');
+          panel?.classList.toggle('open', this.mobileSheetOpen);
+          scrim?.classList.toggle('open', this.mobileSheetOpen);
+          return;
+        }
 
         // Treatment Builder navigation
         if (action === 'tb-back-to-body') { this.view = 'body'; this.render(); return; }
