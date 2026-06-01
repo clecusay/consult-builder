@@ -1576,9 +1576,7 @@ class TreatmentBuilderWidget extends HTMLElement {
           <button class="tb-success-flow-continue" style="background:${pc}" data-action="success-next">
             Continue ${raw(ICONS.chevronRight)}
           </button>
-        ` : html`
-          <button class="tb-reset-btn" data-action="reset">Start Over</button>
-        `}
+        ` : false}
       </div>
     `;
   }
