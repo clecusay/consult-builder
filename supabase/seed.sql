@@ -78,10 +78,9 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 
 -- Arms (female)
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
-  (null, 'a0000001-0000-0000-0000-000000000002', 'Upper Arm Laxity', 'upper-arm-laxity', 1),
-  (null, 'a0000001-0000-0000-0000-000000000002', 'Loose Skin', 'loose-skin', 2),
-  (null, 'a0000001-0000-0000-0000-000000000002', 'Excess Fat', 'excess-fat', 3),
-  (null, 'a0000001-0000-0000-0000-000000000002', 'Hyperpigmentation', 'hyperpigmentation', 4);
+  (null, 'a0000001-0000-0000-0000-000000000002', 'Loose Skin', 'loose-skin', 1),
+  (null, 'a0000001-0000-0000-0000-000000000002', 'Excess Fat', 'excess-fat', 2),
+  (null, 'a0000001-0000-0000-0000-000000000002', 'Hyperpigmentation', 'hyperpigmentation', 3);
 
 -- Breasts (female, slug='chest')
 -- WS4: Removed "Micromastia", "Acne", "Hyperpigmentation". Added "Sagging Breasts", "Breast Reduction", "Implant Exchange", "Breast Removal / Top Surgery"
@@ -124,7 +123,7 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'a0000001-0000-0000-0000-000000000007', 'Veins', 'veins', 1),
   (null, 'a0000001-0000-0000-0000-000000000007', 'Broken Blood Vessels', 'broken-blood-vessels', 2),
-  (null, 'a0000001-0000-0000-0000-000000000007', 'Cherry Angiomas', 'cherry-angiomas', 3),
+  (null, 'a0000001-0000-0000-0000-000000000007', 'Red Spots', 'red-spots', 3),
   (null, 'a0000001-0000-0000-0000-000000000007', 'Dry Skin', 'dry-skin', 4),
   (null, 'a0000001-0000-0000-0000-000000000007', 'Hyperpigmentation', 'hyperpigmentation', 5),
   (null, 'a0000001-0000-0000-0000-000000000007', 'Muscle Sculpting', 'muscle-sculpting', 6);
@@ -138,7 +137,7 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'a0000001-0000-0000-0000-000000000009', 'Excess Fat', 'excess-fat', 1),
   (null, 'a0000001-0000-0000-0000-000000000009', 'Loose Skin', 'loose-skin', 2),
-  (null, 'a0000001-0000-0000-0000-000000000009', 'Keloid Scars', 'keloid-scars', 3),
+  (null, 'a0000001-0000-0000-0000-000000000009', 'Raised Scars', 'raised-scars', 3),
   (null, 'a0000001-0000-0000-0000-000000000009', 'Uneven Skin Texture', 'uneven-skin-texture', 4),
   (null, 'a0000001-0000-0000-0000-000000000009', 'Acne', 'acne', 5),
   (null, 'a0000001-0000-0000-0000-000000000009', 'Hyperpigmentation', 'hyperpigmentation', 6),
@@ -157,34 +156,30 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 -- ===================
 
 -- Upper Face (female)
--- WS4: Moved eye concerns (Hooded Eyelids, Puffy Eyes, Eye Bags) to Midface
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'a0000001-0000-0000-0000-000000000011', 'Wrinkles', 'wrinkles', 1),
   (null, 'a0000001-0000-0000-0000-000000000011', 'Crow''s Feet', 'crows-feet', 2),
   (null, 'a0000001-0000-0000-0000-000000000011', 'Frown Lines', 'frown-lines', 3),
   (null, 'a0000001-0000-0000-0000-000000000011', 'Fine Lines', 'fine-lines', 4),
-  (null, 'a0000001-0000-0000-0000-000000000011', 'Hyperpigmentation', 'hyperpigmentation', 5),
-  (null, 'a0000001-0000-0000-0000-000000000011', 'Acne', 'acne', 6),
-  (null, 'a0000001-0000-0000-0000-000000000011', 'Acne Scarring', 'acne-scarring', 7);
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Hooded Eyelids', 'hooded-eyelids', 5),
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Puffy Eyes', 'puffy-eyes', 6),
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Eye Bags', 'eye-bags', 7),
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Hyperpigmentation', 'hyperpigmentation', 8),
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Acne', 'acne', 9),
+  (null, 'a0000001-0000-0000-0000-000000000011', 'Acne Scarring', 'acne-scarring', 10);
 
 -- Midface (female)
--- WS4: Removed Port Wine Stains, Freckles. Merged Rosacea+Melasma -> Skin Discoloration.
---       Moved in eye concerns. Added Wrinkles, Rhinoplasty, Septoplasty.
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'a0000001-0000-0000-0000-000000000012', 'Loss of Facial Volume', 'loss-of-facial-volume', 1),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Nasolabial Folds', 'nasolabial-folds', 2),
+  (null, 'a0000001-0000-0000-0000-000000000012', 'Smile Lines', 'smile-lines', 2),
   (null, 'a0000001-0000-0000-0000-000000000012', 'Acne', 'acne', 3),
   (null, 'a0000001-0000-0000-0000-000000000012', 'Acne Scarring', 'acne-scarring', 4),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Skin Discoloration', 'skin-discoloration', 5),
+  (null, 'a0000001-0000-0000-0000-000000000012', 'Hyperpigmentation', 'hyperpigmentation', 5),
   (null, 'a0000001-0000-0000-0000-000000000012', 'Broken Blood Vessels', 'broken-blood-vessels', 6),
   (null, 'a0000001-0000-0000-0000-000000000012', 'Uneven Skin Texture', 'uneven-skin-texture', 7),
   (null, 'a0000001-0000-0000-0000-000000000012', 'Facial Asymmetry', 'facial-asymmetry', 8),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Hooded Eyelids', 'hooded-eyelids', 20),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Puffy Eyes', 'puffy-eyes', 21),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Eye Bags', 'eye-bags', 22),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Wrinkles', 'wrinkles', 23),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Rhinoplasty', 'rhinoplasty', 24),
-  (null, 'a0000001-0000-0000-0000-000000000012', 'Septoplasty', 'septoplasty', 25);
+  (null, 'a0000001-0000-0000-0000-000000000012', 'Nose Reshaping (Rhinoplasty)', 'nose-reshaping-rhinoplasty', 24),
+  (null, 'a0000001-0000-0000-0000-000000000012', 'Deviated Septum Correction', 'deviated-septum-correction', 25);
 
 -- Lower Face (female)
 -- WS4: Added "Chin Implant"
@@ -202,11 +197,10 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 
 -- Neck (female)
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
-  (null, 'a0000001-0000-0000-0000-000000000014', 'Platysmal Bands', 'platysmal-bands', 1),
+  (null, 'a0000001-0000-0000-0000-000000000014', 'Neck Bands', 'neck-bands', 1),
   (null, 'a0000001-0000-0000-0000-000000000014', 'Loose Skin', 'loose-skin', 2),
   (null, 'a0000001-0000-0000-0000-000000000014', 'Wrinkles', 'wrinkles', 3),
-  (null, 'a0000001-0000-0000-0000-000000000014', 'Double Chin', 'double-chin', 4),
-  (null, 'a0000001-0000-0000-0000-000000000014', 'Hyperpigmentation', 'hyperpigmentation', 5);
+  (null, 'a0000001-0000-0000-0000-000000000014', 'Hyperpigmentation', 'hyperpigmentation', 4);
 
 -- Lips (female)
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
@@ -238,7 +232,7 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 -- Chest (male)
 -- WS4: Added "Breast Enhancement"
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
-  (null, 'b0000001-0000-0000-0000-000000000003', 'Gynecomastia', 'gynecomastia', 1),
+  (null, 'b0000001-0000-0000-0000-000000000003', 'Enlarged Male Breasts', 'enlarged-male-breasts', 1),
   (null, 'b0000001-0000-0000-0000-000000000003', 'Enlarged Areolas', 'enlarged-areolas', 2),
   (null, 'b0000001-0000-0000-0000-000000000003', 'Excess Fat', 'excess-fat', 3),
   (null, 'b0000001-0000-0000-0000-000000000003', 'Acne', 'acne', 4),
@@ -271,7 +265,9 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'b0000001-0000-0000-0000-000000000007', 'Veins', 'veins', 1),
   (null, 'b0000001-0000-0000-0000-000000000007', 'Broken Blood Vessels', 'broken-blood-vessels', 2),
-  (null, 'b0000001-0000-0000-0000-000000000007', 'Muscle Sculpting', 'muscle-sculpting', 3);
+  (null, 'b0000001-0000-0000-0000-000000000007', 'Hyperpigmentation', 'hyperpigmentation', 3),
+  (null, 'b0000001-0000-0000-0000-000000000007', 'Dry Skin', 'dry-skin', 4),
+  (null, 'b0000001-0000-0000-0000-000000000007', 'Muscle Sculpting', 'muscle-sculpting', 5);
 
 -- Intimate (male)
 -- WS4: New region
@@ -283,7 +279,7 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'b0000001-0000-0000-0000-000000000008', 'Excess Fat', 'excess-fat', 1),
   (null, 'b0000001-0000-0000-0000-000000000008', 'Loose Skin', 'loose-skin', 2),
-  (null, 'b0000001-0000-0000-0000-000000000008', 'Keloid Scars', 'keloid-scars', 3),
+  (null, 'b0000001-0000-0000-0000-000000000008', 'Raised Scars', 'raised-scars', 3),
   (null, 'b0000001-0000-0000-0000-000000000008', 'Acne', 'acne', 4),
   (null, 'b0000001-0000-0000-0000-000000000008', 'Hyperpigmentation', 'hyperpigmentation', 5);
 
@@ -299,33 +295,30 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 -- ===================
 
 -- Upper Face (male)
--- WS4: Moved eye concerns (Hooded Eyelids, Puffy Eyes, Eye Bags) to Midface
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'b0000001-0000-0000-0000-000000000010', 'Wrinkles', 'wrinkles', 1),
   (null, 'b0000001-0000-0000-0000-000000000010', 'Crow''s Feet', 'crows-feet', 2),
   (null, 'b0000001-0000-0000-0000-000000000010', 'Frown Lines', 'frown-lines', 3),
   (null, 'b0000001-0000-0000-0000-000000000010', 'Fine Lines', 'fine-lines', 4),
-  (null, 'b0000001-0000-0000-0000-000000000010', 'Acne', 'acne', 5),
-  (null, 'b0000001-0000-0000-0000-000000000010', 'Acne Scarring', 'acne-scarring', 6),
-  (null, 'b0000001-0000-0000-0000-000000000010', 'Hyperpigmentation', 'hyperpigmentation', 7);
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Hooded Eyelids', 'hooded-eyelids', 5),
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Puffy Eyes', 'puffy-eyes', 6),
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Eye Bags', 'eye-bags', 7),
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Acne', 'acne', 8),
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Acne Scarring', 'acne-scarring', 9),
+  (null, 'b0000001-0000-0000-0000-000000000010', 'Hyperpigmentation', 'hyperpigmentation', 10);
 
 -- Midface (male)
--- WS4: Removed Rosacea -> Skin Discoloration. Moved in eye concerns. Added Wrinkles, Rhinoplasty, Septoplasty.
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
   (null, 'b0000001-0000-0000-0000-000000000011', 'Loss of Facial Volume', 'loss-of-facial-volume', 1),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Nasolabial Folds', 'nasolabial-folds', 2),
+  (null, 'b0000001-0000-0000-0000-000000000011', 'Smile Lines', 'smile-lines', 2),
   (null, 'b0000001-0000-0000-0000-000000000011', 'Acne', 'acne', 3),
   (null, 'b0000001-0000-0000-0000-000000000011', 'Acne Scarring', 'acne-scarring', 4),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Skin Discoloration', 'skin-discoloration', 5),
+  (null, 'b0000001-0000-0000-0000-000000000011', 'Hyperpigmentation', 'hyperpigmentation', 5),
   (null, 'b0000001-0000-0000-0000-000000000011', 'Broken Blood Vessels', 'broken-blood-vessels', 6),
   (null, 'b0000001-0000-0000-0000-000000000011', 'Uneven Skin Texture', 'uneven-skin-texture', 7),
   (null, 'b0000001-0000-0000-0000-000000000011', 'Facial Asymmetry', 'facial-asymmetry', 8),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Hooded Eyelids', 'hooded-eyelids', 20),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Puffy Eyes', 'puffy-eyes', 21),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Eye Bags', 'eye-bags', 22),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Wrinkles', 'wrinkles', 23),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Rhinoplasty', 'rhinoplasty', 24),
-  (null, 'b0000001-0000-0000-0000-000000000011', 'Septoplasty', 'septoplasty', 25);
+  (null, 'b0000001-0000-0000-0000-000000000011', 'Nose Reshaping (Rhinoplasty)', 'nose-reshaping-rhinoplasty', 24),
+  (null, 'b0000001-0000-0000-0000-000000000011', 'Deviated Septum Correction', 'deviated-septum-correction', 25);
 
 -- Lower Face (male)
 -- WS4: Added "Chin Implant"
@@ -342,10 +335,9 @@ insert into public.concerns (tenant_id, body_region_id, name, slug, display_orde
 
 -- Neck (male)
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values
-  (null, 'b0000001-0000-0000-0000-000000000013', 'Platysmal Bands', 'platysmal-bands', 1),
+  (null, 'b0000001-0000-0000-0000-000000000013', 'Neck Bands', 'neck-bands', 1),
   (null, 'b0000001-0000-0000-0000-000000000013', 'Loose Skin', 'loose-skin', 2),
-  (null, 'b0000001-0000-0000-0000-000000000013', 'Double Chin', 'double-chin', 3),
-  (null, 'b0000001-0000-0000-0000-000000000013', 'Wrinkles', 'wrinkles', 4);
+  (null, 'b0000001-0000-0000-0000-000000000013', 'Wrinkles', 'wrinkles', 3);
 
 -- Lips (male)
 insert into public.concerns (tenant_id, body_region_id, name, slug, display_order) values

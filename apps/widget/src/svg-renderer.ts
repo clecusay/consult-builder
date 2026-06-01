@@ -20,6 +20,7 @@ function renderAnchor(
   activeSlugs: Set<string>,
   primaryColor: string,
   isFace: boolean,
+  centerX: number,
 ): SafeHTML {
   const isActive = anchor.regionSlugs.some(s => activeSlugs.has(s));
   if (!isActive) return html``;
@@ -27,12 +28,15 @@ function renderAnchor(
   const isSelected = anchor.regionSlugs.some(s => selectedSlugs.has(s));
   const r = HIGHLIGHT_RADII[anchor.id] || 120;
   const circleR = isFace ? 50 : 60;
-  const labelX = anchor.labelSide === 'right' ? anchor.x + circleR + 20 : anchor.x - circleR - 20;
-  const ta = anchor.labelSide === 'right' ? 'start' : 'end';
+  // Labels wrap inward toward the centerline: markers on the right half get their
+  // label on the left, and vice versa (matches the "hands" placement).
+  const labelSide = anchor.x > centerX ? 'left' : 'right';
+  const labelX = labelSide === 'right' ? anchor.x + circleR + 20 : anchor.x - circleR - 20;
+  const ta = labelSide === 'right' ? 'start' : 'end';
   const s = isSelected ? circleR * 0.85 : circleR * 0.75;
   const hitR = Math.max(circleR + 20, 70);
   const strokeW = isFace ? 3 : 3;
-  const fontSize = isFace ? 50 : 58;
+  const fontSize = isFace ? 64 : 74;
 
   return html`
     <g class="tb-anchor" data-anchor-slugs="${anchor.regionSlugs.join(',')}" style="cursor:pointer">
@@ -54,7 +58,7 @@ function renderAnchor(
       ${isSelected
         ? raw(`<svg x="${anchor.x - s / 2}" y="${anchor.y - s / 2}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`)
         : raw(`<svg x="${anchor.x - s / 2}" y="${anchor.y - s / 2}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${primaryColor}" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`)}
-      <text x="${labelX}" y="${anchor.y + 14}" text-anchor="${ta}" font-size="${fontSize}" font-weight="600" fill="${isSelected ? primaryColor : '#334155'}" opacity="0" class="tb-anchor-label">${isSelected ? `${anchor.label} ✕` : anchor.label}</text>
+      <text x="${labelX}" y="${anchor.y + fontSize / 3}" text-anchor="${ta}" font-size="${fontSize}" data-base-fs="${fontSize}" font-weight="600" fill="${isSelected ? primaryColor : '#3f3a32'}" stroke="#fffefa" stroke-width="3" paint-order="stroke" opacity="0" class="tb-anchor-label">${anchor.label}</text>
       <circle cx="${anchor.x}" cy="${anchor.y}" r="${hitR}" fill="transparent"/>
     </g>`;
 }
@@ -77,12 +81,14 @@ export function renderBodySVG(
   const anchors = isFront
     ? (isFemale ? FEMALE_ANCHORS : MALE_ANCHORS)
     : (isFemale ? FEMALE_BACK_ANCHORS : MALE_BACK_ANCHORS);
+  const [vbX, , vbW] = vb.split(' ').map(Number);
+  const centerX = vbX + vbW / 2;
 
   return html`
     <svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
       <defs><filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter></defs>
-      <path d="${raw(silhouette)}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" filter="url(#tb-shadow)"/>
-      ${anchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, false))}
+      <path d="${raw(silhouette)}" fill="#efe8db" stroke="#a89d8a" stroke-width="4" filter="url(#tb-shadow)"/>
+      ${anchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, false, centerX))}
       ${raw('<style>.tb-anchor:hover .tb-anchor-label{opacity:1!important}</style>')}
     </svg>`;
 }
@@ -100,17 +106,23 @@ export function renderFaceSVG(
   const facePath = isFemale ? FEMALE_FACE_PATH : MALE_FACE_PATH;
   const faceAnchors = isFemale ? FEMALE_FACE_ANCHORS : MALE_FACE_ANCHORS;
 
+  // Inset the zone divider lines to ~4% of the visible viewBox width.
+  const [vbX, , vbW] = faceVB.split(' ').map(Number);
+  const zoneX1 = Math.round(vbX + vbW * 0.04);
+  const zoneX2 = Math.round(vbX + vbW * 0.96);
+
   return html`
     <svg viewBox="${faceVB}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible">
       <defs>
         <filter id="tb-fshadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>
         <filter id="tb-shadow"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".1"/></filter>
       </defs>
-      <path d="${raw(facePath)}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" filter="url(#tb-fshadow)"/>
+      <path d="${raw(facePath)}" fill="#efe8db" stroke="#a89d8a" stroke-width="4" filter="url(#tb-fshadow)"/>
       ${FACE_ZONE_LINES.map(line =>
-        html`<line x1="272" y1="${line.y}" x2="1280" y2="${line.y}" stroke="#e2e8f0" stroke-width="4" stroke-dasharray="16 12"/>`
+        html`<line x1="${zoneX1}" y1="${line.y}" x2="${zoneX2}" y2="${line.y}" stroke="#e9e0d2" stroke-width="4" stroke-dasharray="16 12"/>`
       )}
-      ${faceAnchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, true))}
+      ${/* Face anchors sit on the centerline — keep labels to the right. */ ''}
+      ${faceAnchors.map(a => renderAnchor(a, selectedSlugs, activeSlugs, primaryColor, true, Number.POSITIVE_INFINITY))}
       ${raw('<style>.tb-anchor:hover .tb-anchor-label{opacity:1!important}</style>')}
     </svg>`;
 }

@@ -75,10 +75,12 @@ export const HIGHLIGHT_RADII: Record<string, number> = {
 };
 
 // Viewboxes
-export const FEMALE_BODY_VB = '-50 -160 1085 3470';
-export const MALE_BODY_VB = '-50 -160 1085 3470';
-export const FEMALE_FACE_VB = '0 0 1630 1490';
-export const MALE_FACE_VB = '0 0 1630 1490';
+export const FEMALE_BODY_VB = '-50 -40 1085 3250';
+export const MALE_BODY_VB = '-50 -40 1085 3250';
+// Cropped to the head/face (the original art also draws neck + shoulders, which
+// shrank the face). Gender-specific x-offset keeps each head centered.
+export const FEMALE_FACE_VB = '340 0 840 1140';
+export const MALE_FACE_VB = '390 0 840 1140';
 
 // Face zone dividers (horizontal lines)
 export const FACE_ZONE_LINES = [

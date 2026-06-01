@@ -21,7 +21,7 @@ import { ICONS } from './icons';
 import { renderBodySVG, renderFaceSVG } from './svg-renderer';
 import { getPainPoints, getOutcomes, BARRIERS, type TBOption } from './treatment-builder-data';
 
-type View = 'body' | 'guided-concerns' | 'form'
+type View = 'welcome' | 'body' | 'guided-concerns' | 'form'
   | 'success-thankyou' | 'success-doctor' | 'success-calendar'
   | 'tb-pain-points' | 'tb-outcomes' | 'tb-barriers' | 'tb-bridge' | 'tb-lead-capture';
 
@@ -188,23 +188,29 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
   'droopy': ['loose skin', 'jowls', 'hooded eyelids', 'sagging breasts'],
   'lipo': ['liposuction', 'excess fat', 'contouring'],
   'fat': ['excess fat', 'liposuction', 'contouring', 'double chin'],
-  'nose': ['rhinoplasty', 'septoplasty'],
-  'nose job': ['rhinoplasty'],
+  'nose': ['nose reshaping (rhinoplasty)', 'deviated septum correction'],
+  'nose job': ['nose reshaping (rhinoplasty)'],
+  'rhinoplasty': ['nose reshaping (rhinoplasty)'],
+  'septoplasty': ['deviated septum correction'],
+  'deviated septum': ['deviated septum correction'],
   'chin': ['chin implant', 'double chin', 'jowls'],
   'tummy': ['tummy tuck', 'abdomen', 'liposuction', 'c-section scar'],
   'breast': ['breast enhancement', 'breast reduction', 'breast asymmetry', 'sagging breasts', 'implant exchange', 'breast removal / top surgery', 'enlarged areolas'],
+  'gynecomastia': ['enlarged male breasts'],
   'implant': ['implant exchange', 'breast enhancement', 'chin implant'],
-  'scar': ['acne scarring', 'c-section scar', 'keloid scars', 'stretch marks'],
+  'scar': ['acne scarring', 'c-section scar', 'raised scars', 'stretch marks'],
+  'keloid': ['raised scars'],
   'eyes': ['eye bags', 'puffy eyes', 'hooded eyelids', 'crow\'s feet'],
   'eyelid': ['hooded eyelids'],
   'botox': ['wrinkles', 'frown lines', 'crow\'s feet', 'fine lines'],
-  'filler': ['loss of facial volume', 'nasolabial folds', 'thin lips', 'lip enhancement'],
+  'filler': ['loss of facial volume', 'smile lines', 'thin lips', 'lip enhancement'],
   'lift': ['breast enhancement', 'tummy tuck', 'sagging breasts'],
-  'skin': ['loose skin', 'uneven skin texture', 'dry skin', 'skin discoloration'],
-  'discoloration': ['skin discoloration', 'hyperpigmentation'],
-  'redness': ['skin discoloration', 'broken blood vessels'],
-  'rosacea': ['skin discoloration'],
-  'melasma': ['skin discoloration'],
+  'skin': ['loose skin', 'uneven skin texture', 'dry skin', 'hyperpigmentation'],
+  'discoloration': ['hyperpigmentation'],
+  'redness': ['hyperpigmentation', 'broken blood vessels'],
+  'rosacea': ['hyperpigmentation'],
+  'melasma': ['hyperpigmentation'],
+  'platysmal bands': ['neck bands'],
   'waist': ['waist shaping', 'flanks', 'contouring'],
   'rib': ['rib contouring'],
   'vein': ['veins', 'broken blood vessels'],
@@ -222,7 +228,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   private eventsBound = false;
 
   // View state
-  private view: View = 'body';
+  private view: View = 'welcome';
   private selectedGender: 'female' | 'male' = 'female';
   private bodySide: 'front' | 'back' = 'front';
   private diagramView: 'body' | 'face' = 'body';
@@ -278,11 +284,26 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.shadow = this.attachShadow({ mode: 'closed' });
   }
 
+  private onResize = () => this.capAnchorLabels();
+
   disconnectedCallback() {
     window.removeEventListener('message', this.onEmbedMessage);
+    window.removeEventListener('resize', this.onResize);
+  }
+
+  private ensureFonts() {
+    const id = 'tb-fonts-fraunces-manrope';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Manrope:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
   }
 
   async connectedCallback() {
+    this.ensureFonts();
+    window.addEventListener('resize', this.onResize);
     this.tenantId = this.getAttribute('data-tenant-id') || '';
     if (!this.tenantId) {
       this.shadow.innerHTML = '<p style="color:red;padding:1rem">Missing data-tenant-id attribute</p>';
@@ -298,7 +319,7 @@ class TreatmentBuilderWidget extends HTMLElement {
     // same-origin (last only works when widget is hosted on our own domain).
     this.apiBase = this.getAttribute('data-api') || SCRIPT_ORIGIN || '';
 
-    this.shadow.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:96px 16px;color:#64748b;font-size:13px">Loading...</div>';
+    this.shadow.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:96px 16px;color:#7a746a;font-size:13px">Loading...</div>';
 
     try {
       let url = `${this.apiBase}/api/widget/config?tenant_id=${encodeURIComponent(this.tenantId)}`;
@@ -430,6 +451,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   private get currentStep(): number {
+    if (this.view === 'welcome') return 0;
     if (this.view === 'form') return 2;
     if (this.view === 'guided-concerns') return 1;
     if (this.view !== 'body') return 2;
@@ -587,7 +609,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   private setGender(g: 'female' | 'male') {
     if (g === this.selectedGender) return;
     this.selectedGender = g;
-    this.diagramView = 'body';
+    this.diagramView = this.isFaceOnly ? 'face' : 'body';
     this.bodySide = 'front';
     this.selectedRegionSlugs.clear();
     this.selectedConcernIds.clear();
@@ -598,7 +620,7 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   private reset() {
-    this.view = 'body';
+    this.view = 'welcome';
     const allFace = this.config && this.config.regions.length > 0 &&
       this.config.regions.every(r => r.body_area === 'face');
     this.diagramView = allFace ? 'face' : 'body';
@@ -639,7 +661,8 @@ class TreatmentBuilderWidget extends HTMLElement {
     const style = raw(`<style>${cssVars}${widgetStyles}${fullpageCss}</style>`);
 
     let content: SafeHTML;
-    if (this.view === 'success-thankyou') content = this.renderSuccessThankYou();
+    if (this.view === 'welcome') content = html`${this.renderBodyView()}${this.renderWelcomeModal()}`;
+    else if (this.view === 'success-thankyou') content = this.renderSuccessThankYou();
     else if (this.view === 'success-doctor') content = this.renderSuccessDoctor();
     else if (this.view === 'success-calendar') content = this.renderSuccessCalendar();
     else if (this.view === 'form') content = this.renderForm();
@@ -653,6 +676,9 @@ class TreatmentBuilderWidget extends HTMLElement {
 
     this.shadow.innerHTML = html`${style}${content}`.value;
     this.wireEvents();
+
+    // Labels live in scaled SVG space; pin their rendered size to a 20px cap.
+    requestAnimationFrame(() => this.capAnchorLabels());
 
     // Lock height after first render to prevent layout shifts
     if (this.lockedHeight === null) {
@@ -669,10 +695,31 @@ class TreatmentBuilderWidget extends HTMLElement {
     }
   }
 
+  // Anchor labels are <text> in SVG user units, so their on-screen size scales
+  // with the diagram. Cap the rendered size at 20px (smaller diagrams keep their
+  // natural, smaller size). Recomputed on every render and on resize.
+  private static readonly MAX_LABEL_PX = 20;
+
+  private capAnchorLabels() {
+    const svgs = this.shadow.querySelectorAll<SVGSVGElement>('.tb-diagram-wrap svg');
+    svgs.forEach(svg => {
+      const ctm = svg.getScreenCTM();
+      const scale = ctm ? ctm.a : 0;
+      if (!scale) return;
+      const maxUnits = TreatmentBuilderWidget.MAX_LABEL_PX / scale;
+      svg.querySelectorAll<SVGTextElement>('.tb-anchor-label').forEach(t => {
+        const base = parseFloat(t.getAttribute('data-base-fs') || '0');
+        if (!base) return;
+        t.setAttribute('font-size', String(Math.min(base, maxUnits)));
+      });
+    });
+  }
+
   // ── Step Indicator ──
 
   private renderStepIndicator(): SafeHTML {
     const steps = ['Select Areas', 'Your Concerns', 'Your Info'];
+    const romans = ['i', 'ii', 'iii'];
     return html`
       <div class="tb-steps">
         ${steps.map((label, i) => {
@@ -680,14 +727,14 @@ class TreatmentBuilderWidget extends HTMLElement {
           const isCompleted = i < this.currentStep;
           const dotClass = `tb-step-dot ${isActive ? 'active' : isCompleted ? 'completed' : 'pending'}`;
           return html`
-            ${i > 0 ? html`<div class="tb-step-line" style="background:${i <= this.currentStep ? this.primaryColor : '#e2e8f0'}"></div>` : false}
+            ${i > 0 ? html`<div class="tb-step-line${i <= this.currentStep ? ' filled' : ''}"></div>` : false}
             <div class="tb-step">
               <div class="${dotClass}">
                 ${isCompleted
-                  ? raw('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>')
-                  : html`<span class="tb-step-num" style="color:${isActive ? '#fff' : '#94a3b8'}">${i + 1}</span>`}
+                  ? raw('<svg viewBox="0 0 24 24" fill="none" stroke="#f6f1e8" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>')
+                  : html`<span class="tb-step-num">${romans[i]}</span>`}
               </div>
-              <span class="tb-step-label" style="color:${isActive ? this.primaryColor : '#94a3b8'}">${label}</span>
+              <span class="tb-step-label${isActive ? ' active' : ''}">${label}</span>
             </div>
           `;
         })}
@@ -696,6 +743,36 @@ class TreatmentBuilderWidget extends HTMLElement {
   }
 
   // ── Body Diagram View ──
+
+  // ── Welcome / Intro Popup ──
+
+  private renderWelcomeModal(): SafeHTML {
+    const cfg = this.config!;
+    const practice = cfg.tenant.name;
+    const steps = [
+      'Select your area of focus.',
+      'Choose the concerns that interest you.',
+      'Submit to learn about your options.',
+    ];
+
+    return html`
+      <div class="tb-welcome-overlay">
+        <div class="tb-welcome-modal" role="dialog" aria-modal="true">
+          ${cfg.tenant.logo_url ? html`<img class="tb-welcome-logo" src="${cfg.tenant.logo_url}" alt="${practice}">` : false}
+          <h2 class="tb-welcome-title">Take the first step in your virtual consultation</h2>
+          <p class="tb-welcome-sub">Learn about your options in three simple steps.</p>
+          <ol class="tb-welcome-steps">
+            ${steps.map((t, i) => html`
+              <li class="tb-welcome-step">
+                <span class="tb-welcome-step-num">${String(i + 1).padStart(2, '0')}</span>
+                <span class="tb-welcome-step-text">${t}</span>
+              </li>`)}
+          </ol>
+          <button class="tb-welcome-cta" data-action="start">Get started ${raw(ICONS.chevronRight)}</button>
+        </div>
+      </div>
+    `;
+  }
 
   private renderBodyView(): SafeHTML {
     if (this.useCards) return this.renderCardBody();
@@ -775,6 +852,23 @@ class TreatmentBuilderWidget extends HTMLElement {
     `;
   }
 
+  /** Top bar for the body diagram: a front/back toggle on the left and the
+      current orientation label on the right. Frees the full width for the body. */
+  private renderOrientationBar(): SafeHTML {
+    const isFront = this.bodySide === 'front';
+    const targetSide = isFront ? 'back' : 'front';
+    const toggleLabel = isFront ? 'View back' : 'View front';
+    const orientation = isFront ? 'Anterior' : 'Posterior';
+    return html`
+      <div class="tb-orient-bar">
+        <button class="tb-orient-toggle" data-side="${targetSide}" title="${toggleLabel}">
+          ${raw(ICONS.rotateCcw)} ${toggleLabel}
+        </button>
+        <span class="tb-orient-label">${orientation}</span>
+      </div>
+    `;
+  }
+
   private renderSplitBody(): SafeHTML {
     const cfg = this.config!;
     const pc = this.primaryColor;
@@ -793,22 +887,14 @@ class TreatmentBuilderWidget extends HTMLElement {
           <div class="tb-diagram-col">
             ${this.diagramView === 'face' && !this.isFaceOnly
               ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
-              : false}
+              : this.diagramView === 'body' ? this.renderOrientationBar() : false}
 
             <div class="tb-diagram-row">
-              ${this.diagramView === 'body' ? html`
-                <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
-              ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
-
               <div class="tb-diagram-wrap${this.isFaceOnly ? ' tb-face-only' : ''}">
                 ${this.diagramView === 'body'
                   ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
                   : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
               </div>
-
-              ${this.diagramView === 'body' ? html`
-                <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
-              ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
             </div>
 
             <div class="tb-gender-switch">
@@ -861,22 +947,14 @@ class TreatmentBuilderWidget extends HTMLElement {
           </button>
           ${this.diagramView === 'face' && !this.isFaceOnly
             ? html`<button class="tb-back-to-body" data-action="back-to-body-diagram">${raw(ICONS.chevronLeft.replace('viewBox', 'width="14" height="14" viewBox'))} Back to Body</button>`
-            : false}
+            : this.diagramView === 'body' ? this.renderOrientationBar() : false}
 
           <div class="tb-diagram-row">
-            ${this.diagramView === 'body' ? html`
-              <button class="tb-rotate-btn" data-side="front" title="Front">${raw(ICONS.rotateCcw)} Front</button>
-            ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
-
             <div class="tb-guided-diagram${this.isFaceOnly ? ' tb-face-only' : ''}">
               ${this.diagramView === 'body'
                 ? renderBodySVG(this.selectedGender, this.bodySide, this.selectedRegionSlugs, this.activeRegionSlugs, pc)
                 : renderFaceSVG(this.selectedGender, this.selectedRegionSlugs, this.activeRegionSlugs, pc)}
             </div>
-
-            ${this.diagramView === 'body' ? html`
-              <button class="tb-rotate-btn" data-side="back" title="Back">Back ${raw(ICONS.rotateCw)}</button>
-            ` : this.isFaceOnly ? false : html`<div class="tb-rotate-spacer"></div>`}
           </div>
 
           <div class="tb-gender-switch">
@@ -946,10 +1024,10 @@ class TreatmentBuilderWidget extends HTMLElement {
           return html`
             ${groups}
             ${this.concernsByRegion.length === 0
-              ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+              ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#a89f90">No concerns configured for the selected areas.</p>`
               : false}
             ${hasQuery && !anyVisible
-              ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+              ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#a89f90">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
               : false}
           `;
         })() : false}
@@ -1055,10 +1133,10 @@ class TreatmentBuilderWidget extends HTMLElement {
               return html`
                 ${groups}
                 ${this.concernsByRegion.length === 0
-                  ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns configured for the selected areas.</p>`
+                  ? html`<p style="padding:16px 0;text-align:center;font-size:13px;color:#a89f90">No concerns configured for the selected areas.</p>`
                   : false}
                 ${hasQuery && !anyVisible
-                  ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#94a3b8">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
+                  ? html`<p style="padding:24px 0;text-align:center;font-size:13px;color:#a89f90">No concerns match &ldquo;${this.concernSearchQuery}&rdquo;</p>`
                   : false}
               `;
             })() : false}
@@ -1111,14 +1189,14 @@ class TreatmentBuilderWidget extends HTMLElement {
           const isCompleted = i < currentStep;
           const dotClass = `tb-step-dot ${isActive ? 'active' : isCompleted ? 'completed' : 'pending'}`;
           return html`
-            ${i > 0 ? html`<div class="tb-step-line" style="background:${i <= currentStep ? pc : '#e2e8f0'}"></div>` : false}
+            ${i > 0 ? html`<div class="tb-step-line" style="background:${i <= currentStep ? pc : '#e9e0d2'}"></div>` : false}
             <div class="tb-step">
               <div class="${dotClass}">
                 ${isCompleted
                   ? raw('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>')
-                  : html`<span class="tb-step-num" style="color:${isActive ? '#fff' : '#94a3b8'}">${i + 1}</span>`}
+                  : html`<span class="tb-step-num" style="color:${isActive ? '#fff' : '#a89f90'}">${i + 1}</span>`}
               </div>
-              <span class="tb-step-label" style="color:${isActive ? pc : '#94a3b8'}">${label}</span>
+              <span class="tb-step-label" style="color:${isActive ? pc : '#a89f90'}">${label}</span>
             </div>
           `;
         })}
@@ -1559,7 +1637,7 @@ class TreatmentBuilderWidget extends HTMLElement {
       <div class="tb-success-dots">
         ${views.map((_, i) => html`
           <div class="tb-success-dot ${i === activeIdx ? 'active' : ''}"
-               style="background:${i === activeIdx ? pc : '#cbd5e1'}"></div>
+               style="background:${i === activeIdx ? pc : '#d8cebd'}"></div>
         `)}
       </div>
     `;
@@ -1569,6 +1647,8 @@ class TreatmentBuilderWidget extends HTMLElement {
   private renderSuccessNav(currentView: View): SafeHTML {
     const pc = this.primaryColor;
     const next = this.nextSuccessView(currentView);
+    const websiteUrl = this.config?.tenant.website_url;
+    const safeWebsiteUrl = websiteUrl && /^https?:\/\//i.test(websiteUrl) ? websiteUrl : '';
     return html`
       <div class="tb-success-flow-footer">
         ${this.renderSuccessStepDots(currentView)}
@@ -1576,6 +1656,10 @@ class TreatmentBuilderWidget extends HTMLElement {
           <button class="tb-success-flow-continue" style="background:${pc}" data-action="success-next">
             Continue ${raw(ICONS.chevronRight)}
           </button>
+        ` : safeWebsiteUrl ? html`
+          <a class="tb-success-flow-continue" href="${safeWebsiteUrl}" rel="noopener noreferrer" style="background:${pc};text-decoration:none;display:inline-flex">
+            Go to main website ${raw(ICONS.chevronRight)}
+          </a>
         ` : false}
       </div>
     `;
@@ -1697,6 +1781,7 @@ class TreatmentBuilderWidget extends HTMLElement {
 
         // Actions
         const action = el.getAttribute('data-action');
+        if (action === 'start') { this.view = 'body'; this.lockedHeight = null; this.render(); return; }
         if (action === 'continue') { this.view = this.isTreatmentBuilder ? 'tb-pain-points' : 'form'; this.render(); return; }
         if (action === 'guided-to-concerns') { this.view = this.isTreatmentBuilder ? 'tb-pain-points' : 'guided-concerns'; this.render(); return; }
         if (action === 'guided-back-to-body') { this.view = 'body'; this.render(); return; }
