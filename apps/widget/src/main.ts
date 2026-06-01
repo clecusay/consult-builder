@@ -1416,10 +1416,12 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           ${optInFields.length > 0 ? html`
             <div class="tb-optin">
-              <label class="tb-optin-label">
-                <input type="checkbox" name="communication_opt_in"/>
-                <span>I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime.</span>
-              </label>
+              ${optInFields.map(f => html`
+                <label class="tb-optin-label">
+                  <input type="checkbox" name="${f.field_key || 'communication_opt_in'}"/>
+                  <span>${f.placeholder || f.label || "I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime."}</span>
+                </label>
+              `)}
             </div>
           ` : false}
 
@@ -1471,10 +1473,12 @@ class TreatmentBuilderWidget extends HTMLElement {
 
           ${optInFields.length > 0 ? html`
             <div class="tb-optin">
-              <label class="tb-optin-label">
-                <input type="checkbox" name="communication_opt_in"/>
-                <span>I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime.</span>
-              </label>
+              ${optInFields.map(f => html`
+                <label class="tb-optin-label">
+                  <input type="checkbox" name="${f.field_key || 'communication_opt_in'}"/>
+                  <span>${f.placeholder || f.label || "I'd like to receive updates, promotions, and appointment reminders via email and SMS. Unsubscribe anytime."}</span>
+                </label>
+              `)}
             </div>
           ` : false}
 
@@ -1562,7 +1566,10 @@ class TreatmentBuilderWidget extends HTMLElement {
       fieldEl = html`
         <select class="tb-select" name="location_id" ${req}>
           <option value="">${field.placeholder || 'Select a location...'}</option>
-          ${locs.map(loc => html`<option value="${loc.id}"${this.locationId === loc.id ? raw(' selected') : false}>${loc.name}${loc.city ? html` — ${loc.city}${loc.state ? html`, ${loc.state}` : false}` : false}</option>`)}
+          ${locs.map(loc => {
+            const label = loc.city ? `${loc.city}${loc.state ? `, ${loc.state}` : ''}` : loc.name;
+            return html`<option value="${loc.id}"${this.locationId === loc.id ? raw(' selected') : false}>${label}</option>`;
+          })}
         </select>
       `;
     } else if (field.field_type === 'textarea') {
@@ -2158,6 +2165,26 @@ class TreatmentBuilderWidget extends HTMLElement {
           throw new Error(data.error || `Submission failed (${res.status})`);
         }
       }
+      // Notify the host page (GTM / analytics) of a successful submission.
+      // Only non-PHI metadata is pushed to the page dataLayer — no contact
+      // details or health concern data leave the widget here.
+      try {
+        const submittedUuid = formLocationId || this.locationId || undefined;
+        const submittedLocation = submittedUuid
+          ? this.config.locations.find(l => l.id === submittedUuid)
+          : undefined;
+        const w = window as unknown as { dataLayer?: Array<Record<string, unknown>> };
+        w.dataLayer = w.dataLayer || [];
+        w.dataLayer.push({
+          event: 'consultBuilder.formSubmission',
+          tenant_id: this.config.tenant.id,
+          tenant_slug: this.config.tenant.slug,
+          location_id: submittedLocation?.slug || submittedUuid || undefined,
+        });
+      } catch {
+        // dataLayer is optional; never let analytics break the success flow.
+      }
+
       // Lock the height so the success flow doesn't collapse
       const root = this.shadow.querySelector('.tb-root') as HTMLElement | null;
       if (root) {

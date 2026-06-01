@@ -44,11 +44,15 @@ interface CustomField {
   is_required: boolean;
   display_order: number;
   options: string[] | null;
+  placeholder?: string | null;
   isNew?: boolean;
 }
 
 /** field_keys that are always present (managed outside presets/custom) */
 const SYSTEM_FIELD_KEYS = new Set(['first_name', 'last_name', 'email', 'sms_opt_in', 'email_opt_in', 'communication_opt_in']);
+
+/** Default consent/opt-in text shown next to the communication checkbox. Editable per-tenant. */
+const DEFAULT_CONSENT_TEXT = 'I agree to receive communications including appointment reminders, promotions, and special offers via email and SMS. Message & data rates may apply. Unsubscribe anytime.';
 const PRESET_FIELD_KEYS = new Set(['phone', 'date_of_birth', 'procedure']);
 
 interface PresetField {
@@ -121,6 +125,7 @@ export default function FormFieldsPage() {
   const [newProcedure, setNewProcedure] = useState('');
   const [activeServices, setActiveServices] = useState<ActiveService[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [consentText, setConsentText] = useState<string>(DEFAULT_CONSENT_TEXT);
   const [dataLoading, setDataLoading] = useState(true);
 
   // Form provider: 'native' uses our built-in fields below; 'embed' renders a
@@ -150,7 +155,7 @@ export default function FormFieldsPage() {
       const [{ data: existingFields }, { data: widgetConfig }, svcList] = await Promise.all([
         supabase
           .from('form_fields')
-          .select('id, field_key, label, field_type, is_required, display_order, options')
+          .select('id, field_key, label, field_type, is_required, display_order, options, placeholder')
           .eq('tenant_id', tenantId)
           .order('display_order', { ascending: true }),
         supabase
@@ -190,6 +195,10 @@ export default function FormFieldsPage() {
       const SYSTEM_LABELS = new Set(['first name', 'last name', 'email', 'sms opt-in', 'email opt-in']);
 
       for (const f of allFields) {
+        // Capture the per-tenant consent text from the opt-in row before skipping it.
+        if (f.field_key === 'communication_opt_in') {
+          setConsentText(f.placeholder?.trim() || DEFAULT_CONSENT_TEXT);
+        }
         // Skip system fields by field_key or by label fallback
         if (f.field_key && SYSTEM_FIELD_KEYS.has(f.field_key)) continue;
         if (!f.field_key && SYSTEM_LABELS.has(f.label.toLowerCase())) continue;
@@ -344,7 +353,7 @@ export default function FormFieldsPage() {
     }
 
     // ── 4. Opt-in fields (always at the end) ──
-    allRows.push({ tenant_id: tenantId, field_key: 'communication_opt_in', label: 'Communication Opt-In', field_type: 'checkbox', placeholder: 'I agree to receive communications including appointment reminders, promotions, and special offers via email and SMS. Message & data rates may apply. Unsubscribe anytime.', is_required: false, display_order: 100, options: null });
+    allRows.push({ tenant_id: tenantId, field_key: 'communication_opt_in', label: 'Communication Opt-In', field_type: 'checkbox', placeholder: consentText.trim() || DEFAULT_CONSENT_TEXT, is_required: false, display_order: 100, options: null });
 
     const { error: insertError } = await supabase.from('form_fields').insert(allRows);
     if (insertError) throw new Error(insertError.message);
@@ -923,6 +932,32 @@ export default function FormFieldsPage() {
               No custom fields added. Click &quot;Add Field&quot; to create one.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Communication Consent */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            Communication Consent
+          </CardTitle>
+          <CardDescription>
+            The consent text shown next to the opt-in checkbox at the bottom of your form. Use your practice&apos;s exact legal language.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label className="text-xs">Consent text</Label>
+          <textarea
+            value={consentText}
+            onChange={(e) => setConsentText(e.target.value)}
+            rows={5}
+            placeholder={DEFAULT_CONSENT_TEXT}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave blank to use the default. This text is specific to your practice and is not shared with other accounts.
+          </p>
         </CardContent>
       </Card>
     </>);
