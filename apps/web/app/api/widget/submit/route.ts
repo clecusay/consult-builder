@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { deliverWebhook } from '@/lib/webhooks/deliver';
-import { type WebhookFormat } from '@/lib/webhooks/format';
+import { buildCrmFlatPayload, type WebhookFormat } from '@/lib/webhooks/format';
 import { sendNotificationEmails } from '@/lib/email/send-notification';
 import { rateLimit } from '@/lib/rate-limit';
 import { getCorsOrigin, corsHeaders, handleCorsOptions } from '@/lib/cors';
@@ -42,11 +42,21 @@ const submissionSchema = z.object({
   sms_opt_in: z.boolean().optional(),
   email_opt_in: z.boolean().optional(),
   source_url: z.string().url().optional(),
+  landing_page: z.string().url().optional(),
+  referrer: z.string().optional(),
+  session_source: z.string().optional(),
   utm_source: z.string().optional(),
   utm_medium: z.string().optional(),
   utm_campaign: z.string().optional(),
   utm_content: z.string().optional(),
   utm_term: z.string().optional(),
+  gclid: z.string().optional(),
+  fbclid: z.string().optional(),
+  treatment_builder: z.object({
+    pain_points: z.array(z.string()).default([]),
+    desired_outcomes: z.array(z.string()).default([]),
+    barriers: z.array(z.string()).default([]),
+  }).optional(),
 });
 
 const submitLimiter = rateLimit({ limit: 10, windowMs: 60_000, keyPrefix: 'submit' });
@@ -104,9 +114,9 @@ export async function POST(request: Request) {
     // Parallel: validate location + fetch webhook config (both need tenant.id)
     const [locationResult, configResult] = await Promise.all([
       data.location_id
-        ? supabase.from('tenant_locations').select('id, name, city, state').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
+        ? supabase.from('tenant_locations').select('id, slug, name, city, state').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
         : Promise.resolve({ data: null, error: null }),
-      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins').eq('tenant_id', tenant.id).single(),
+      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, store_submissions').eq('tenant_id', tenant.id).single(),
     ]);
 
     if (data.location_id && (locationResult.error || !locationResult.data)) {
@@ -114,99 +124,170 @@ export async function POST(request: Request) {
     }
 
     const config = configResult.data;
+    // Storage is on unless the tenant explicitly turned it off.
+    const storeSubmissions = config?.store_submissions !== false;
+
+    // Resolve location for CRM mapping: slug is the canonical location_id,
+    // with a human-readable name assembled from name/city/state.
+    const locationSlug = locationResult.data?.slug || null;
+    const resolvedLocationId = locationSlug || data.location_id || undefined;
+    const locationName = locationResult.data
+      ? [locationResult.data.name, locationResult.data.city, locationResult.data.state].filter(Boolean).join(', ')
+      : null;
+
+    // Marketing attribution persisted alongside the lead.
+    const attribution = {
+      utm_source: data.utm_source || null,
+      utm_medium: data.utm_medium || null,
+      utm_campaign: data.utm_campaign || null,
+      utm_content: data.utm_content || null,
+      utm_term: data.utm_term || null,
+      gclid: data.gclid || null,
+      fbclid: data.fbclid || null,
+      referrer: data.referrer || null,
+      session_source: data.session_source || null,
+      landing_page: data.landing_page || null,
+    };
 
     // Merge opt-in values into custom_fields for storage
     const customFields = { ...data.custom_fields };
     if (data.sms_opt_in !== undefined) customFields['SMS Opt-In'] = data.sms_opt_in;
     if (data.email_opt_in !== undefined) customFields['Email Opt-In'] = data.email_opt_in;
 
-    // Insert submission
-    const { data: submission, error: insertError } = await supabase
-      .from('form_submissions')
-      .insert({
-        tenant_id: tenant.id,
-        location_id: data.location_id || null,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        phone: data.phone || null,
-        gender: data.gender,
-        selected_regions: data.selected_regions,
-        selected_concerns: data.selected_concerns,
-        selected_services: data.selected_services,
-        custom_fields: customFields,
-        source_url: data.source_url || null,
-        lead_status: 'new',
-        webhook_status: config?.webhook_url ? 'pending' : null,
-      })
-      .select()
-      .single();
+    // Persist the lead unless storage is disabled for this tenant. When off,
+    // we still forward the webhook + notifications below.
+    let submissionId: string | null = null;
+    let submittedAt = new Date().toISOString();
+    if (storeSubmissions) {
+      const { data: submission, error: insertError } = await supabase
+        .from('form_submissions')
+        .insert({
+          tenant_id: tenant.id,
+          location_id: data.location_id || null,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email,
+          phone: data.phone || null,
+          date_of_birth: data.date_of_birth || null,
+          gender: data.gender,
+          selected_regions: data.selected_regions,
+          selected_concerns: data.selected_concerns,
+          selected_services: data.selected_services,
+          custom_fields: customFields,
+          attribution,
+          source_url: data.source_url || null,
+          lead_status: 'new',
+          webhook_status: config?.webhook_url ? 'pending' : null,
+        })
+        .select('id, created_at')
+        .single();
 
-    if (insertError) {
-      console.error('Failed to save submission:', insertError);
-      return NextResponse.json({ error: 'Failed to save submission' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
+      if (insertError) {
+        console.error('Failed to save submission:', insertError);
+        return NextResponse.json({ error: 'Failed to save submission' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
+      }
+      submissionId = submission.id;
+      submittedAt = submission.created_at;
     }
 
     // Fire webhook (non-blocking)
     if (config?.webhook_url) {
+      const webhookFormat = (config.webhook_format as WebhookFormat) ?? 'generic';
+      // 'crm_flat' delivers the canonical flat payload (identical to the
+      // browser-direct shape); other formats keep the nested envelope.
+      const webhookBody = webhookFormat === 'crm_flat'
+        ? buildCrmFlatPayload({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            email: data.email,
+            phone: data.phone,
+            date_of_birth: data.date_of_birth,
+            gender: data.gender,
+            location_id: resolvedLocationId,
+            location_uuid: data.location_id,
+            location_name: locationName,
+            selected_regions: data.selected_regions,
+            selected_concerns: data.selected_concerns,
+            selected_services: data.selected_services,
+            custom_fields: data.custom_fields,
+            utm_source: data.utm_source,
+            utm_medium: data.utm_medium,
+            utm_campaign: data.utm_campaign,
+            utm_content: data.utm_content,
+            utm_term: data.utm_term,
+            gclid: data.gclid,
+            fbclid: data.fbclid,
+            source_url: data.source_url,
+            landing_page: data.landing_page,
+            referrer: data.referrer,
+            session_source: data.session_source,
+            sms_opt_in: data.sms_opt_in,
+            email_opt_in: data.email_opt_in,
+            treatment_builder: data.treatment_builder,
+          })
+        : {
+            event: 'submission.created',
+            submission: {
+              id: submissionId,
+              tenant_id: tenant.id,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              email: data.email,
+              phone: data.phone || null,
+              date_of_birth: data.date_of_birth || null,
+              location: locationResult.data ? locationResult.data.name : null,
+              location_id: data.location_id || null,
+              gender: data.gender,
+              area_of_concern: data.selected_regions.map(r => r.region_name).join(', '),
+              concerns: data.selected_concerns.map(c => c.concern_name).join(', '),
+              selected_regions: data.selected_regions,
+              selected_concerns: data.selected_concerns,
+              selected_services: data.selected_services,
+              custom_fields: customFields,
+              sms_opt_in: data.sms_opt_in,
+              email_opt_in: data.email_opt_in,
+              source_url: data.source_url,
+              utm_source: data.utm_source || null,
+              utm_medium: data.utm_medium || null,
+              utm_campaign: data.utm_campaign || null,
+              utm_content: data.utm_content || null,
+              utm_term: data.utm_term || null,
+              submitted_at: submittedAt,
+            },
+          };
+
       (async () => {
         try {
           const result = await deliverWebhook(
             config.webhook_url,
             config.webhook_secret,
-            {
-              event: 'submission.created',
-              submission: {
-                id: submission.id,
-                tenant_id: tenant.id,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                email: data.email,
-                phone: data.phone || null,
-                date_of_birth: data.date_of_birth || null,
-                location: locationResult.data ? locationResult.data.name : null,
-                location_id: data.location_id || null,
-                gender: data.gender,
-                area_of_concern: data.selected_regions.map(r => r.region_name).join(', '),
-                concerns: data.selected_concerns.map(c => c.concern_name).join(', '),
-                selected_regions: data.selected_regions,
-                selected_concerns: data.selected_concerns,
-                selected_services: data.selected_services,
-                custom_fields: customFields,
-                sms_opt_in: data.sms_opt_in,
-                email_opt_in: data.email_opt_in,
-                source_url: data.source_url,
-                utm_source: data.utm_source || null,
-                utm_medium: data.utm_medium || null,
-                utm_campaign: data.utm_campaign || null,
-                utm_content: data.utm_content || null,
-                utm_term: data.utm_term || null,
-                submitted_at: submission.created_at,
-              },
-            },
-            (config.webhook_format as WebhookFormat) ?? 'generic'
+            webhookBody,
+            webhookFormat
           );
 
-          await supabase
-            .from('form_submissions')
-            .update({
-              webhook_status: result.ok ? 'sent' : 'failed',
-              webhook_sent_at: new Date().toISOString(),
-            })
-            .eq('id', submission.id);
+          if (submissionId) {
+            await supabase
+              .from('form_submissions')
+              .update({
+                webhook_status: result.ok ? 'sent' : 'failed',
+                webhook_sent_at: new Date().toISOString(),
+              })
+              .eq('id', submissionId);
+          }
         } catch (err) {
           console.error('Webhook delivery failed:', err);
-          await supabase
-            .from('form_submissions')
-            .update({ webhook_status: 'failed' })
-            .eq('id', submission.id);
+          if (submissionId) {
+            await supabase
+              .from('form_submissions')
+              .update({ webhook_status: 'failed' })
+              .eq('id', submissionId);
+          }
         }
       })();
     }
 
     // Send notification emails (non-blocking)
     if (config?.notification_emails?.length) {
-      const locationName = locationResult.data ? locationResult.data.name : null;
       sendNotificationEmails(
         config.notification_emails,
         tenant.name || 'Unknown',
@@ -216,7 +297,7 @@ export async function POST(request: Request) {
           email: data.email,
           phone: data.phone,
           date_of_birth: data.date_of_birth,
-          location: locationName,
+          location: locationResult.data ? locationResult.data.name : null,
           gender: data.gender,
           area_of_concern: data.selected_regions.map(r => r.region_name).join(', '),
           concerns: data.selected_concerns.map(c => c.concern_name).join(', '),
@@ -224,7 +305,7 @@ export async function POST(request: Request) {
           utm_source: data.utm_source,
           utm_medium: data.utm_medium,
           utm_campaign: data.utm_campaign,
-          submitted_at: submission.created_at,
+          submitted_at: submittedAt,
         }
       ).catch(err => console.error('Notification email error:', err));
     }
@@ -232,7 +313,7 @@ export async function POST(request: Request) {
     const origin = getCorsOrigin(request, config?.allowed_origins as string[] | null);
 
     return NextResponse.json(
-      { success: true, id: submission.id },
+      { success: true, id: submissionId },
       {
         headers: corsHeaders(origin),
       }

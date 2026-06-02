@@ -140,6 +140,8 @@ export default function FormFieldsPage() {
   // straight to the CRM webhook so PHI never touches our infrastructure.
   const [submissionTarget, setSubmissionTarget] = useState<SubmissionTarget>('backend');
   const [crmWebhookUrl, setCrmWebhookUrl] = useState('');
+  // Backend target only: whether leads are persisted to form_submissions.
+  const [storeSubmissions, setStoreSubmissions] = useState(true);
 
   // Track which presets are enabled
   const [enabledPresets, setEnabledPresets] = useState<Record<string, boolean>>({
@@ -160,7 +162,7 @@ export default function FormFieldsPage() {
           .order('display_order', { ascending: true }),
         supabase
           .from('widget_configs')
-          .select('form_provider, embed_form_url, embed_form_height, submission_target, crm_webhook_url')
+          .select('form_provider, embed_form_url, embed_form_height, submission_target, crm_webhook_url, store_submissions')
           .eq('tenant_id', tenantId)
           .single(),
         getActiveServices(supabase, tenantId!),
@@ -172,6 +174,7 @@ export default function FormFieldsPage() {
         setEmbedFormHeight(widgetConfig.embed_form_height || 600);
         setSubmissionTarget((widgetConfig.submission_target as SubmissionTarget) || 'backend');
         setCrmWebhookUrl(widgetConfig.crm_webhook_url || '');
+        setStoreSubmissions(widgetConfig.store_submissions !== false);
       }
 
       setActiveServices(svcList.map((s) => ({
@@ -300,6 +303,7 @@ export default function FormFieldsPage() {
       embed_form_url: formProvider === 'embed' ? embedFormUrl.trim() || null : null,
       embed_form_height: embedFormHeight,
       submission_target: formProvider === 'native' ? submissionTarget : 'backend',
+      store_submissions: storeSubmissions,
       crm_webhook_url:
         formProvider === 'native' && submissionTarget === 'webhook_direct'
           ? crmWebhookUrl.trim() || null
@@ -571,6 +575,21 @@ export default function FormFieldsPage() {
               </div>
             </button>
           </div>
+
+          {submissionTarget === 'backend' && (
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Store leads in your dashboard</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When on, submissions are saved to your Submissions tab (and you can delete them there). When off, leads are forwarded to your webhook only and never stored on our servers.
+                </p>
+              </div>
+              <Switch
+                checked={storeSubmissions}
+                onCheckedChange={setStoreSubmissions}
+              />
+            </div>
+          )}
 
           {submissionTarget === 'webhook_direct' && (
             <div className="space-y-4">

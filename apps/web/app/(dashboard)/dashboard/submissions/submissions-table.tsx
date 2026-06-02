@@ -1,7 +1,10 @@
 'use client';
 
 import { Fragment, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -22,6 +25,7 @@ import {
   User,
   MessageSquare,
   Clock,
+  Trash2,
 } from 'lucide-react';
 
 type Submission = {
@@ -95,7 +99,15 @@ function formatDateTime(dateStr: string) {
   return `${month}/${day}/${year}, ${hours}:${mins} ${ampm}`;
 }
 
-function SubmissionDetail({ sub }: { sub: Submission }) {
+function SubmissionDetail({
+  sub,
+  onDelete,
+  deleting,
+}: {
+  sub: Submission;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+}) {
   const regions = Array.isArray(sub.selected_regions)
     ? sub.selected_regions.filter((r) => r.region_name)
     : [];
@@ -265,12 +277,44 @@ function SubmissionDetail({ sub }: { sub: Submission }) {
           </div>
         </>
       )}
+
+      <Separator />
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={deleting}
+          onClick={() => onDelete(sub.id)}
+          className="text-muted-foreground hover:text-red-600"
+        >
+          <Trash2 className="h-4 w-4" />
+          {deleting ? 'Deleting...' : 'Delete submission'}
+        </Button>
+      </div>
     </div>
   );
 }
 
 export function SubmissionsTable({ submissions }: { submissions: Submission[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('Delete this submission permanently? This cannot be undone.')) return;
+    setDeletingId(id);
+    const { error } = await supabase.from('form_submissions').delete().eq('id', id);
+    if (error) {
+      console.error('[submissions] Delete failed:', error);
+      window.alert('Could not delete the submission. Please try again.');
+      setDeletingId(null);
+      return;
+    }
+    setExpandedId(null);
+    setDeletingId(null);
+    router.refresh();
+  }
 
   return (
     <Table>
@@ -336,7 +380,7 @@ export function SubmissionsTable({ submissions }: { submissions: Submission[] })
               {isExpanded && (
                 <TableRow data-state="selected" className="hover:bg-transparent">
                   <TableCell colSpan={7} className="border-t-0 bg-muted/30 px-6 pt-0 pb-4">
-                    <SubmissionDetail sub={sub} />
+                    <SubmissionDetail sub={sub} onDelete={handleDelete} deleting={deletingId === sub.id} />
                   </TableCell>
                 </TableRow>
               )}

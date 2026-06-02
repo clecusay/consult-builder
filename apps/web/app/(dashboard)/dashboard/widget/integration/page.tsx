@@ -246,11 +246,12 @@ export default function IntegrationSettingsPage() {
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <option value="generic">Generic JSON</option>
+              <option value="crm_flat">CRM (flat)</option>
               <option value="discord">Discord</option>
               <option value="slack">Slack</option>
             </select>
             <p className="text-xs text-muted-foreground">
-              Choose the format that matches your webhook receiver. Discord and Slack skip HMAC signing.
+              Choose the format that matches your webhook receiver. CRM (flat) sends the same flat lead shape as the browser-direct submission. Discord and Slack skip HMAC signing.
             </p>
           </div>
           <div className="flex items-center gap-3">

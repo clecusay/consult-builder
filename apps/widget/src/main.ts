@@ -2035,6 +2035,7 @@ class TreatmentBuilderWidget extends HTMLElement {
       selected_services: selectedServices,
       custom_fields: customFields,
       source_url: window.location.href,
+      landing_page: landingPage,
       utm_source: utmSource,
       utm_medium: utmMedium,
       utm_campaign: utmCampaign,
