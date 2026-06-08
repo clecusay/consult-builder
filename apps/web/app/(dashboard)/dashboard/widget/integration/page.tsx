@@ -22,6 +22,7 @@ import {
   Plus,
   X,
   Zap,
+  BarChart3,
 } from 'lucide-react';
 import { SaveButton } from '@/components/ui/save-button';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -35,6 +36,7 @@ interface IntegrationConfig {
   webhook_format: WebhookFormat;
   notification_emails: string[];
   allowed_origins: string[];
+  gtm_container_id: string;
 }
 
 export default function IntegrationSettingsPage() {
@@ -45,6 +47,7 @@ export default function IntegrationSettingsPage() {
     webhook_format: 'generic',
     notification_emails: [],
     allowed_origins: [],
+    gtm_container_id: '',
   });
   const [configLoading, setConfigLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -58,7 +61,7 @@ export default function IntegrationSettingsPage() {
       const { data: widgetConfig } = await supabase
         .from('widget_configs')
         .select(
-          'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins'
+          'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, gtm_container_id'
         )
         .eq('tenant_id', tenantId)
         .single();
@@ -70,6 +73,7 @@ export default function IntegrationSettingsPage() {
           webhook_format: (widgetConfig.webhook_format as WebhookFormat) ?? 'generic',
           notification_emails: widgetConfig.notification_emails ?? [],
           allowed_origins: widgetConfig.allowed_origins ?? [],
+          gtm_container_id: widgetConfig.gtm_container_id ?? '',
         });
       }
       setConfigLoading(false);
@@ -86,6 +90,7 @@ export default function IntegrationSettingsPage() {
       webhook_format: config.webhook_format,
       notification_emails: config.notification_emails,
       allowed_origins: config.allowed_origins,
+      gtm_container_id: config.gtm_container_id.trim() || null,
     });
   }
 
@@ -375,6 +380,45 @@ export default function IntegrationSettingsPage() {
             domain. Include the full origin with protocol (e.g.,
             https://example.com).
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Analytics / GTM */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </CardTitle>
+          <CardDescription>
+            Track conversions on the hosted consultation page
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="gtm_container_id">Google Tag Manager Container ID</Label>
+            <Input
+              id="gtm_container_id"
+              value={config.gtm_container_id}
+              onChange={(e) =>
+                setConfig({ ...config, gtm_container_id: e.target.value })
+              }
+              placeholder="GTM-XXXXXXX"
+            />
+            {config.gtm_container_id.trim() &&
+              !/^GTM-[A-Z0-9]+$/i.test(config.gtm_container_id.trim()) && (
+                <p className="text-xs text-red-600">
+                  Must be a valid GTM container ID, e.g. GTM-XXXXXXX.
+                </p>
+              )}
+            <p className="text-xs text-muted-foreground">
+              Only needed for the hosted consultation page. When set, that page
+              loads this container and fires a{' '}
+              <code className="font-mono">consultBuilder.formSubmission</code>{' '}
+              dataLayer event on submit. Embeds use your own site&apos;s GTM, so
+              this isn&apos;t required for them.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

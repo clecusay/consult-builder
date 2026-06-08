@@ -38,6 +38,17 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
 
   if (!tenant) notFound();
 
+  const { data: widgetConfig } = await supabase
+    .from('widget_configs')
+    .select('gtm_container_id')
+    .eq('tenant_id', tenant.id)
+    .single();
+
+  // Only accept a strict GTM container id; this value is interpolated into an
+  // inline script below, so anything else is dropped to avoid HTML injection.
+  const rawGtmId = widgetConfig?.gtm_container_id?.trim() ?? '';
+  const gtmId = /^GTM-[A-Z0-9]+$/i.test(rawGtmId) ? rawGtmId : null;
+
   const attrs = buildWidgetAttrs({
     tenantId: tenant.id,
     fullpage: true,
@@ -49,6 +60,27 @@ export default async function WidgetFullPage({ params, searchParams }: Props) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: 'html,body{margin:0;padding:0;height:100%}#__next{height:100%}' }} />
+      {gtmId && (
+        <>
+          {/* Per-tenant Google Tag Manager. The widget pushes
+              consultBuilder.formSubmission to window.dataLayer on submit; this
+              container is what consumes it on the hosted page. */}
+          <Script id="gtm-init" strategy="afterInteractive">
+            {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${gtmId}');`}
+          </Script>
+          {/* First-touch attribution helper, mirrors the embed setup so paid
+              campaign data survives cross-page navigation on the hosted page. */}
+          <Script src="/track.js" strategy="afterInteractive" />
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+        </>
+      )}
       <div
         style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
         dangerouslySetInnerHTML={{
