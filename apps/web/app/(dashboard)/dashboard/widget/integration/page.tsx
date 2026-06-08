@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Loader2,
   Webhook,
@@ -23,6 +24,8 @@ import {
   X,
   Zap,
   BarChart3,
+  Database,
+  AlertTriangle,
 } from 'lucide-react';
 import { SaveButton } from '@/components/ui/save-button';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -37,6 +40,8 @@ interface IntegrationConfig {
   notification_emails: string[];
   allowed_origins: string[];
   gtm_container_id: string;
+  forward_to_webhook: boolean;
+  store_submissions: boolean;
 }
 
 export default function IntegrationSettingsPage() {
@@ -48,6 +53,8 @@ export default function IntegrationSettingsPage() {
     notification_emails: [],
     allowed_origins: [],
     gtm_container_id: '',
+    forward_to_webhook: false,
+    store_submissions: true,
   });
   const [configLoading, setConfigLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -61,7 +68,7 @@ export default function IntegrationSettingsPage() {
       const { data: widgetConfig } = await supabase
         .from('widget_configs')
         .select(
-          'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, gtm_container_id'
+          'webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, gtm_container_id, forward_to_webhook, store_submissions'
         )
         .eq('tenant_id', tenantId)
         .single();
@@ -74,6 +81,8 @@ export default function IntegrationSettingsPage() {
           notification_emails: widgetConfig.notification_emails ?? [],
           allowed_origins: widgetConfig.allowed_origins ?? [],
           gtm_container_id: widgetConfig.gtm_container_id ?? '',
+          forward_to_webhook: widgetConfig.forward_to_webhook === true,
+          store_submissions: widgetConfig.store_submissions !== false,
         });
       }
       setConfigLoading(false);
@@ -84,6 +93,18 @@ export default function IntegrationSettingsPage() {
 
   async function handleSave() {
     if (!tenantId) return;
+
+    const forward = config.forward_to_webhook;
+    const store = config.store_submissions;
+
+    // Every submission must have somewhere to go.
+    if (!forward && !store) {
+      throw new Error('Choose at least one destination: forward to webhook or store leads in your dashboard.');
+    }
+    if (forward && !config.webhook_url.trim()) {
+      throw new Error('Add a webhook URL to forward submissions, or turn forwarding off.');
+    }
+
     await updateWidgetConfig(supabase, tenantId, {
       webhook_url: config.webhook_url || null,
       webhook_secret: config.webhook_secret || null,
@@ -91,6 +112,8 @@ export default function IntegrationSettingsPage() {
       notification_emails: config.notification_emails,
       allowed_origins: config.allowed_origins,
       gtm_container_id: config.gtm_container_id.trim() || null,
+      forward_to_webhook: forward,
+      store_submissions: store,
     });
   }
 
@@ -201,6 +224,64 @@ export default function IntegrationSettingsPage() {
         <SaveButton onSave={handleSave} />
       </PageHeader>
 
+      {/* Submission Destination */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Submission Destination
+          </CardTitle>
+          <CardDescription>
+            Choose what happens when a visitor submits the form. At least one
+            must be enabled.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-4">
+            <div className="flex-1">
+              <p className="text-sm font-medium">Forward to webhook</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Send each submission to the webhook URL below (e.g. your CRM).
+              </p>
+            </div>
+            <Switch
+              checked={config.forward_to_webhook}
+              onCheckedChange={(v) => setConfig({ ...config, forward_to_webhook: v })}
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-4">
+            <div className="flex-1">
+              <p className="text-sm font-medium">Store leads in your dashboard</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Save submissions to your Submissions tab (where you can view and
+                delete them). Turn off if you only want leads in your CRM.
+              </p>
+            </div>
+            <Switch
+              checked={config.store_submissions}
+              onCheckedChange={(v) => setConfig({ ...config, store_submissions: v })}
+            />
+          </div>
+          {!config.forward_to_webhook && !config.store_submissions && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-900">
+                With both off, submissions have nowhere to go and the form will
+                reject them. Enable at least one before saving.
+              </p>
+            </div>
+          )}
+          {config.forward_to_webhook && !config.webhook_url.trim() && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-900">
+                Add a Webhook URL below for forwarding to work.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Webhook Section */}
       <Card>
         <CardHeader>
@@ -209,7 +290,7 @@ export default function IntegrationSettingsPage() {
             Webhook
           </CardTitle>
           <CardDescription>
-            Receive real-time notifications when new submissions arrive
+            Where submissions are forwarded when &ldquo;Forward to webhook&rdquo; is on
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

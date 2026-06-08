@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       data.location_id
         ? supabase.from('tenant_locations').select('id, slug, name, city, state').eq('id', data.location_id).eq('tenant_id', tenant.id).single()
         : Promise.resolve({ data: null, error: null }),
-      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, store_submissions').eq('tenant_id', tenant.id).single(),
+      supabase.from('widget_configs').select('webhook_url, webhook_secret, webhook_format, notification_emails, allowed_origins, store_submissions, forward_to_webhook').eq('tenant_id', tenant.id).single(),
     ]);
 
     if (data.location_id && (locationResult.error || !locationResult.data)) {
@@ -124,8 +124,20 @@ export async function POST(request: Request) {
     }
 
     const config = configResult.data;
-    // Storage is on unless the tenant explicitly turned it off.
+    // Unified routing: a submission is forwarded to the webhook and/or stored,
+    // based on two independent switches. At least one must be on.
     const storeSubmissions = config?.store_submissions !== false;
+    const forwardToWebhook = config?.forward_to_webhook === true && !!config?.webhook_url;
+
+    if (!storeSubmissions && !forwardToWebhook) {
+      // Misconfiguration (the dashboard blocks saving this state). Don't drop
+      // the lead silently — surface a generic error so it can be fixed.
+      console.error('[widget/submit] No destination configured for tenant', tenant.id);
+      return NextResponse.json(
+        { error: 'This form is not configured to receive submissions yet.' },
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
 
     // Resolve location for CRM mapping: slug is the canonical location_id,
     // with a human-readable name assembled from name/city/state.
@@ -177,7 +189,7 @@ export async function POST(request: Request) {
           attribution,
           source_url: data.source_url || null,
           lead_status: 'new',
-          webhook_status: config?.webhook_url ? 'pending' : null,
+          webhook_status: forwardToWebhook ? 'pending' : null,
         })
         .select('id, created_at')
         .single();
@@ -191,8 +203,8 @@ export async function POST(request: Request) {
     }
 
     // Fire webhook (non-blocking)
-    if (config?.webhook_url) {
-      const webhookFormat = (config.webhook_format as WebhookFormat) ?? 'generic';
+    if (forwardToWebhook) {
+      const webhookFormat = (config!.webhook_format as WebhookFormat) ?? 'generic';
       // 'crm_flat' delivers the canonical flat payload (identical to the
       // browser-direct shape); other formats keep the nested envelope.
       const webhookBody = webhookFormat === 'crm_flat'
@@ -256,32 +268,38 @@ export async function POST(request: Request) {
             },
           };
 
-      (async () => {
-        try {
-          const result = await deliverWebhook(
-            config.webhook_url,
-            config.webhook_secret,
-            webhookBody,
-            webhookFormat
-          );
+      const webhookUrl = config!.webhook_url!;
+      const webhookSecret = config!.webhook_secret;
 
-          if (submissionId) {
-            await supabase
-              .from('form_submissions')
-              .update({
-                webhook_status: result.ok ? 'sent' : 'failed',
-                webhook_sent_at: new Date().toISOString(),
-              })
-              .eq('id', submissionId);
+      (async () => {
+        // Best-effort delivery with one retry. When storage is off this is the
+        // only path the lead has, so a transient CRM hiccup shouldn't lose it.
+        let delivered = false;
+        let lastStatus = 0;
+        for (let attempt = 0; attempt < 2 && !delivered; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+          try {
+            const result = await deliverWebhook(webhookUrl, webhookSecret, webhookBody, webhookFormat);
+            lastStatus = result.status;
+            delivered = result.ok;
+          } catch (err) {
+            // Log the failure reason WITHOUT the payload — never log PHI.
+            console.error(`[widget/submit] Webhook attempt ${attempt + 1} failed for tenant ${tenant.id}:`, err instanceof Error ? err.message : 'unknown error');
           }
-        } catch (err) {
-          console.error('Webhook delivery failed:', err);
-          if (submissionId) {
-            await supabase
-              .from('form_submissions')
-              .update({ webhook_status: 'failed' })
-              .eq('id', submissionId);
-          }
+        }
+
+        if (submissionId) {
+          await supabase
+            .from('form_submissions')
+            .update({
+              webhook_status: delivered ? 'sent' : 'failed',
+              webhook_sent_at: new Date().toISOString(),
+            })
+            .eq('id', submissionId);
+        } else if (!delivered) {
+          // Storage is off, so there's no row to flag. Record a PHI-free marker
+          // so a failed delivery is visible without persisting patient data.
+          console.error(`[widget/submit] Webhook delivery failed for tenant ${tenant.id} (last status ${lastStatus}); lead not stored per config.`);
         }
       })();
     }

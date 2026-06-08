@@ -329,8 +329,6 @@ export interface WidgetConfigResponse {
   form_provider: FormProvider;
   embed_form_url: string | null;
   embed_form_height: number;
-  submission_target: SubmissionTarget;
-  crm_webhook_url: string | null;
   regions: WidgetRegion[];
   service_categories: WidgetServiceCategory[];
   form_fields: WidgetFormField[];

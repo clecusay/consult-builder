@@ -2080,91 +2080,16 @@ class TreatmentBuilderWidget extends HTMLElement {
     this.render();
 
     try {
-      const useDirectWebhook =
-        this.config.submission_target === 'webhook_direct' &&
-        !!this.config.crm_webhook_url;
-
-      if (useDirectWebhook) {
-        // Resolve the selected location (form field overrides data attribute)
-        // into slug, UUID, and human-readable name for CRM mapping.
-        const resolvedLocationUuid = formLocationId || this.locationId || undefined;
-        const resolvedLocation = resolvedLocationUuid
-          ? this.config.locations.find(l => l.id === resolvedLocationUuid)
-          : undefined;
-        // Prefer the configured slug (e.g. "oklahoma_city") as the canonical
-        // location_id for CRM mapping. Falls back to the UUID if no slug set.
-        const resolvedLocationId = resolvedLocation?.slug || resolvedLocationUuid;
-        const locationName = resolvedLocation
-          ? [resolvedLocation.name, resolvedLocation.city, resolvedLocation.state].filter(Boolean).join(', ')
-          : undefined;
-
-        // Browser → CRM webhook directly. Our backend never sees the
-        // submission, so PHI stays out of our infra. Payload is reshaped
-        // to flat fields that map cleanly to CRM custom fields, with the
-        // original nested structures kept for advanced mapping.
-        const directPayload = {
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          email: payload.email,
-          phone: payload.phone,
-          date_of_birth: payload.date_of_birth,
-          gender: payload.gender,
-          location_id: resolvedLocationId,
-          location_uuid: resolvedLocationUuid,
-          location_name: locationName,
-
-          // Flattened selection summaries — easy to drop into CRM fields
-          regions_summary: selectedRegions.map(r => r.region_name).join(', '),
-          concerns_summary: selectedConcerns.map(c => c.concern_name).join(', '),
-          services_summary: selectedServices.map(s => s.service_name).join(', '),
-
-          // Raw selections for tenants who want structured access
-          selected_regions: selectedRegions.map(r => ({ name: r.region_name, slug: r.region_slug })),
-          selected_concerns: selectedConcerns.map(c => ({ name: c.concern_name, region: c.region_name })),
-          selected_services: selectedServices.map(s => ({ name: s.service_name, category: s.category_name })),
-          custom_fields: customFields,
-
-          // Attribution — utm/click-IDs/referrer/landing_page come from
-          // track.js stored on first session page when available; falls back
-          // to current URL otherwise.
-          utm_source: utmSource,
-          utm_medium: utmMedium,
-          utm_campaign: utmCampaign,
-          utm_content: utmContent,
-          utm_term: utmTerm,
-          gclid,
-          fbclid,
-          source_url: window.location.href,
-          landing_page: landingPage,
-          referrer,
-          session_source: sessionSource,
-
-          // Consent
-          sms_opt_in: payload.sms_opt_in,
-          email_opt_in: payload.email_opt_in,
-
-          // Treatment builder bundle (if present)
-          ...(payload.treatment_builder ? { treatment_builder: payload.treatment_builder } : {}),
-        };
-
-        const res = await fetch(this.config.crm_webhook_url!, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(directPayload),
-        });
-        if (!res.ok) {
-          throw new Error(`Submission failed (${res.status})`);
-        }
-      } else {
-        const res = await fetch(`${this.apiBase}/api/widget/submit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || `Submission failed (${res.status})`);
-        }
+      // All submissions go through our backend, which forwards to the
+      // tenant's webhook and/or stores the lead based on their config.
+      const res = await fetch(`${this.apiBase}/api/widget/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Submission failed (${res.status})`);
       }
       // Notify the host page (GTM / analytics) of a successful submission.
       // Only non-PHI metadata is pushed to the page dataLayer — no contact
