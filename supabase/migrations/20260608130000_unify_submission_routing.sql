@@ -24,6 +24,13 @@ ALTER TABLE public.widget_configs
 COMMENT ON COLUMN public.widget_configs.forward_to_webhook IS
   'When true, /api/widget/submit forwards the lead to webhook_url. Pairs with store_submissions; at least one must be enabled.';
 
+-- Widen the webhook_format check to allow the canonical flat CRM payload.
+ALTER TABLE public.widget_configs
+  DROP CONSTRAINT IF EXISTS widget_configs_webhook_format_check;
+ALTER TABLE public.widget_configs
+  ADD CONSTRAINT widget_configs_webhook_format_check
+  CHECK (webhook_format IN ('generic', 'discord', 'slack', 'crm_flat'));
+
 -- Backfill: behavior-neutral migration off the old model.
 
 -- Browser-direct tenants delivered the flat payload straight to their CRM
